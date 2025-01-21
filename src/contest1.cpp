@@ -101,24 +101,31 @@ int main(int argc, char **argv)
         //fill with your code
         // Check if any of the bumpers were pressed.
         bool any_bumper_pressed = false;
-        for (uint32_t b_idx = 0; b_idx < N_BUMPER; ++b_idx) {
-            any_bumper_pressed |= (bumper[b_idx] == kobuki_msgs::BumperEvent::PRESSED);
-        }
-        //
-        // Control logic after bumpers are being pressed.
-        if (posX < 0.5 && yaw < M_PI / 12 && !any_bumper_pressed) {
+        if (posX < 0.5 && yaw < M_PI / 12 && !any_bumper_pressed && minLaserDist > 0.7) {
             angular = 0.0;
             linear = 0.2;
         }
-        else if (yaw < M_PI / 2 && posX > 0.5 && !any_bumper_pressed) {
+        else if (yaw < M_PI / 2 && posX > 0.5 && !any_bumper_pressed && minLaserDist > 0.5) {
             angular = M_PI / 6;
             linear = 0.0;
+        }
+        else if (minLaserDist > 1. && !any_bumper_pressed) {
+            linear = 0.1;
+        if (yaw < 17 / 36 * M_PI || posX > 0.6) {
+            angular = M_PI / 12.;
+        }
+        else if (yaw < 19 / 36 * M_PI || posX < 0.4) {
+            angular = -M_PI / 12.;
+        }
+        else {
+            angular = 0;
+        }
         }
         else {
             angular = 0.0;
             linear = 0.0;
-        break;
         }
+
         vel.angular.z = angular;
         vel.linear.x = linear;
         vel_pub.publish(vel);
