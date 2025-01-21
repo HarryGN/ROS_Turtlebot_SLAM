@@ -11,6 +11,7 @@
 #include <cmath>
 
 #include <chrono>
+#include <thread>
 
 float angular;
 float linear;
@@ -69,11 +70,21 @@ int main(int argc, char **argv)
     uint64_t secondsElapsed = 0;
 
     angular = 0.0;
-    linear = 0.0;
+    linear = 0.1;
 
     while(ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
         //fill with your code
+
+        if(leftBumperPressed || centerBumperPressed || rightBumperPressed){
+            linear = -0.1;
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+        }
+
+        else{
+            linear = 0;
+        }
+
 
         vel.angular.z = angular;
         vel.linear.x = linear;
