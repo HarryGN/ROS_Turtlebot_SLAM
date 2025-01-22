@@ -34,7 +34,7 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
     posX = msg->pose.pose.position.x;
     posY = msg->pose.pose.position.y;
     yaw = tf::getYaw(msg->pose.pose.orientation);
-   
+    ROS_INFO("Position: (%f, %f) Orientation: %frad or %fdegrees.", posX, posY, yaw, RAD2DEG(yaw));
 }
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
@@ -101,34 +101,59 @@ int main(int argc, char **argv)
         //fill with your code
         // Check if any of the bumpers were pressed.
         bool any_bumper_pressed = false;
-        if (posX < 0.5 && yaw < M_PI / 12 && !any_bumper_pressed && minLaserDist > 0.7) {
-            angular = 0.0;
-            linear = 0.2;
-        }
-        else if (yaw < M_PI / 2 && posX > 0.5 && !any_bumper_pressed && minLaserDist > 0.5) {
-            angular = M_PI / 6;
-            linear = 0.0;
-        }
-        else if (minLaserDist > 1. && !any_bumper_pressed) {
-            linear = 0.1;
-        if (yaw < 17 / 36 * M_PI || posX > 0.6) {
-            angular = M_PI / 12.;
-        }
-        else if (yaw < 19 / 36 * M_PI || posX < 0.4) {
-            angular = -M_PI / 12.;
-        }
+        
+        // Set target distance to the wall
+        float target_distance = 0.5;
+
+        // Wall following based on the laser readings
+        if (left_distance < target_distance) {
+            // Too close to the wall, move away
+            angular = 0.2;   // Turn right
+            linear = 0.1; 
+        } 
+        else if (left_distance > target_distance) {
+            // Too far from the wall, move closer
+            angular = -0.2;  // Turn left
+            linear = 0.1;  
+        } 
         else {
-            angular = 0;
+            // Maintain distance from the wall
+            angular = 0.0;   // No turning
+            linear = 0.1; 
         }
-        }
-        else {
-            angular = 0.0;
-            linear = 0.0;
-        }
+
+        '''
+        // if (posX < 0.5 && yaw < M_PI / 12 && !any_bumper_pressed && minLaserDist > 0.7) {
+        //     angular = 0.0;
+        //     linear = 0.2;
+        // }
+        // else if (yaw < M_PI / 2 && posX > 0.5 && !any_bumper_pressed && minLaserDist > 0.5) {
+        //     angular = M_PI / 6;
+        //     linear = 0.0;
+        // }
+        // else if (minLaserDist > 1. && !any_bumper_pressed) {
+        //     linear = 0.1;
+        // if (yaw < 17 / 36 * M_PI || posX > 0.6) {
+        //     angular = M_PI / 12.;
+        // }
+        // else if (yaw < 19 / 36 * M_PI || posX < 0.4) {
+        //     angular = -M_PI / 12.;
+        // }
+        // else {
+        //     angular = 0;
+        // }
+        // }
+        // else {
+        //     angular = 0.0;
+        //     linear = 0.0;
+        //     //break;
+        // }
+        '''
 
         vel.angular.z = angular;
         vel.linear.x = linear;
         vel_pub.publish(vel);
+        
         // The last thing to do is to update the timer.
         secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
         loop_rate.sleep();
