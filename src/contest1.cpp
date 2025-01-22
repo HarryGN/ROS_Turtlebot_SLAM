@@ -21,6 +21,8 @@ uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEven
 float angular = 0.0;
 float linear = 0.0;
 float minLaserDist = std::numeric_limits<float>::infinity();
+
+float left_distance = 0.0, right_distance = 0.0, front_distance = 0.0;
 // float maxLaserDist = std::numeric_limits<float>::();
 int32_t nLasers=0, desiredNLasers=0, desiredAngle=5;
 
@@ -45,13 +47,13 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     // desiredNLasers = desiredAngle*M_PI / (180*msg->angle_increment);
 
     // Get the indices for first, middle, and last readings
-    int left_idx = 0;                 // First reading (left)
+    int right_idx = 0;                 // First reading (left)
     int front_idx = nLasers / 2;      // Middle reading (front)
-    int right_idx = nLasers - 1;      // Last reading (right)
+    int left_idx = nLasers - 1;      // Last reading (right)
     
-    float left_distance = msg->ranges[left_idx];
-    float front_distance = msg->ranges[front_idx];
-    float right_distance = msg->ranges[right_idx];
+    right_distance = msg->ranges[right_idx];
+    front_distance = msg->ranges[front_idx];
+    left_distance = msg->ranges[left_idx];
 
     // Log the results
     ROS_INFO("Left (first) distance: %.2f m", left_distance);
@@ -101,31 +103,33 @@ int main(int argc, char **argv)
         //fill with your code
         // Check if any of the bumpers were pressed.
         bool any_bumper_pressed = false;
-        if (posX < 0.5 && yaw < M_PI / 12 && !any_bumper_pressed && minLaserDist > 0.7) {
-            angular = 0.0;
-            linear = 0.2;
-        }
-        else if (yaw < M_PI / 2 && posX > 0.5 && !any_bumper_pressed && minLaserDist > 0.5) {
-            angular = M_PI / 6;
-            linear = 0.0;
-        }
-        else if (minLaserDist > 1. && !any_bumper_pressed) {
-            linear = 0.1;
-        if (yaw < 17 / 36 * M_PI || posX > 0.6) {
-            angular = M_PI / 12.;
-        }
-        else if (yaw < 19 / 36 * M_PI || posX < 0.4) {
-            angular = -M_PI / 12.;
-        }
-        else {
-            angular = 0;
-        }
-        }
-        else {
-            angular = 0.0;
-            linear = 0.0;
-        }
+        float target_distance = 1.5;
+       if (front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)) {
+    
+            const double k = 0.1;   // Scaling factor for angular velocity
+            const double alpha = 0.5; // Exponential growth/decay rate
 
+            if (left_distance < target_distance) {
+                angular = -k * std::exp(-alpha * left_distance); // Exponential decay for left turns
+                linear = 0.1;                                   // Set a constant forward speed
+            } 
+            else if (left_distance > target_distance) {
+                angular = k * std::exp(-alpha * left_distance);  // Exponential decay for right turns
+                linear = 0.1;                                   // Set a constant forward speed
+            } 
+            else {
+                angular = 0.0;                                  // No angular adjustment
+                linear = 0.1;                                   // Maintain forward speed
+            }
+            else {
+                angular = -0.2;                                     // Rotate in place to adjust
+                linear = 0.0;                                       // Stop forward movement
+            }}
+        
+        else {
+            linear = 0.0;
+            angular = 0.4;                     // Rotate in place to adjust to right
+        }
         vel.angular.z = angular;
         vel.linear.x = linear;
         vel_pub.publish(vel);
