@@ -34,7 +34,7 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
     posX = msg->pose.pose.position.x;
     posY = msg->pose.pose.position.y;
     yaw = tf::getYaw(msg->pose.pose.orientation);
-   
+    ROS_INFO("Position: (%f, %f) Orientation: %frad or %fdegrees.", posX, posY, yaw, RAD2DEG(yaw));
 }
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
