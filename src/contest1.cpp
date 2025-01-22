@@ -92,7 +92,7 @@ int main(int argc, char **argv)
 
        // Wall following logic and obstacle avoidance
        if (front_distance > 1.0 && left_distance > 1.0 && right_distance > 1.0) {
-           // Move forward if all sensors detect more than 1 meter
+           // Move forward if all sensors > 1
            angular = 0.0;   // No turning
            linear = 0.1;     // Move forward
            ROS_INFO("Move Forward.");
