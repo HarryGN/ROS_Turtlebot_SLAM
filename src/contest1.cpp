@@ -13,6 +13,8 @@
 #include <chrono>
 #include <thread>
 
+#include <math.h>
+
 float angular;
 float linear;
 float posX = 0.0, posY = 0.0, yaw = 0.0;
@@ -25,6 +27,10 @@ bool rightBumperPressed;
 #define N_BUMPER (3)
 #define RAD2DEG(rad) ((rad) * 180. / M_PI)
 #define DEG2RAD(deg) ((deg) * M_PI / 180.)
+
+float Deg2Rad(float degrees) {
+    return degrees * (M_PI / 180);
+}
 
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
@@ -69,22 +75,60 @@ int main(int argc, char **argv)
     start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
 
+    // Bumper Event Settings
+    bool bumperStepBack = false;
+    uint64_t tBumperEventStart;
+    uint64_t dBumperStepBack = 2;
+
+    uint64_t dBumperEvent[4] = {3,7,3,7};
+    uint64_t dBumperEventTotal = 0;
+    for(int i = 0; i < sizeof(dBumperEvent)/sizeof(*dBumperEvent); i++){
+        dBumperEventTotal += dBumperEvent[i];
+    }
+
+
     angular = 0.0;
     linear = 0.1;
 
     while(ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
-        //fill with your code
+        
 
+        // Bumper Event
         if(leftBumperPressed || centerBumperPressed || rightBumperPressed){
-            linear = -0.1;
-            std::this_thread::sleep_for(std::chrono::seconds(3));
+            bumperStepBack = true;
+            tBumperEventStart = secondsElapsed;
         }
 
-        else{
-            linear = 0;
-        }
+        if(bumperStepBack){
+            uint64_t dBumperEventRemaining = secondsElapsed - tBumperEventStart;
 
+            if(dBumperEventRemaining < dBumperEvent[0]){
+                linear = -0.1;
+                angular = 0.0;
+            }
+            
+            else if(dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1]){
+                linear = 0.0;
+                angular = Deg2Rad(15);
+            }
+
+            else if(dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2]){
+                linear = 0.1;
+                angular = 0.0;
+            } 
+            
+            else if (dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2] + dBumperEvent[3]){
+                linear = 0.0;
+                angular = Deg2Rad(-15);
+            }
+
+            else{
+                bumperStepBack = false;
+                angular = 0.0;
+                linear = 0.1;
+            }
+        }
 
         vel.angular.z = angular;
         vel.linear.x = linear;
