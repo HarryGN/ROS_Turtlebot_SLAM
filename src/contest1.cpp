@@ -114,7 +114,7 @@ int main(int argc, char **argv)
                 linear = 0.1;                                   // Set a constant forward speed
             } 
             else if (left_distance > target_distance) {
-                angular = k * std::exp(alpha * left_distance);  // Exponential decay for right turns
+                angular = -k * std::exp(alpha * left_distance);  // Exponential decay for right turns
                 linear = 0.1;                                   // Set a constant forward speed
             } 
             else {
