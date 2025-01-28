@@ -22,6 +22,8 @@
 float angular;
 float linear;
 float posX = 0.0, posY = 0.0, yaw = 0.0;
+
+
 float rotationTolerance = Deg2Rad(1);
 float kp_r = 1;
 float kn_r = 0.7;
@@ -59,13 +61,6 @@ void callbackOdom(const nav_msgs::Odometry::ConstPtr& msg)
     posY = msg->pose.pose.position.y;
     yaw = Rad2Deg(tf::getYaw(msg->pose.pose.orientation));
     //ROS_INFO("Position: (%f, %f) Orientation: %f rad or %f degrees.", posX, posY, yaw, Rad2Deg(yaw));
-
-    if(!posX==posX || !posY==posY || !yaw==yaw ){
-        ROS_INFO("NAN ERROR");
-        while(true){
-            continue;
-        }
-    }
 }
 
 float absPow(float base, float exp){
@@ -120,22 +115,7 @@ void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publis
 
     float proportional;
     while(abs(targetHeading - yaw) > rotationTolerance){
-        // Calculate the angular velocity based on PN control algorithm
-        // proportional = kp_r*(targetHeading-yaw);
-        // if(proportional < 0){
-        //     angular = (float) pow(-1*proportional, kn_r);
-        // }
-        // else{
-        //     angular = (float) pow(proportional, kn_r);
-        // }
 
-        // // Adjust angular to not be above or below the threshold
-        // if(angular > maxAngular){
-        //     angular = maxAngular;
-        // }
-        // else if(angular < minAngular){
-        //     angular = minAngular;
-        // }
         angular = computeAngular(targetHeading, yaw);
 
         ros::spinOnce();
