@@ -25,14 +25,14 @@ float posX = 0.0, posY = 0.0, yaw = 0.0;
 float rotationTolerance = Deg2Rad(1);
 float kp_r = 1;
 float kn_r = 0.7;
-float minAngular = 4; // Degrees per second
-float maxAngular = 30; // Degrees per second
+float minAngular = 10; // Degrees per second
+float maxAngular = 90; // Degrees per second
 
 float navigationTolerance = 0.2;
 float kp_n = 0.02;
 float kn_n = 0.5;
-float minLinear = 0.05;
-float maxLinear = 0.2;
+float minLinear = 0.1;
+float maxLinear = 0.45;
 
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 bool leftBumperPressed;
@@ -68,6 +68,52 @@ void callbackOdom(const nav_msgs::Odometry::ConstPtr& msg)
     }
 }
 
+float absPow(float base, float exp){
+    if(base < 0){
+        return (float) -1*pow(-1*base, exp);
+    }
+    else{
+        return (float) pow(base, exp);
+    } 
+}
+
+void applyMagnitudeLimits(float &value, float lowerLimit, float upperLimit){
+    if(value < 0){
+        if(value < -upperLimit){
+            value = -upperLimit;
+        }
+        else if(value > -lowerLimit){
+            value = -lowerLimit;
+        }
+    }
+
+    else if(value > 0){
+        if(value > upperLimit){
+            value = upperLimit;
+        }
+        else if(value < lowerLimit){
+            value = lowerLimit;
+        }
+    }
+}
+
+float computeAngular(float targetHeading, float currentYaw){
+    float angularDeg;
+
+    // Calculate proportional component and then calculate angularDeg based on if it is negative or positive
+    float proportional = kp_r*(targetHeading-currentYaw);
+    if(proportional < 0){
+        angularDeg = (float) -1*pow(-1*proportional, kn_r);
+    }
+    else{
+        angularDeg = (float) pow(proportional, kn_r);
+    }
+
+    applyMagnitudeLimits(angularDeg, minAngular, maxAngular);
+
+    return Deg2Rad(angularDeg);
+}
+
 void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     ROS_INFO("ROTATE TO HEADING CALLED");
     ros::spinOnce();
@@ -75,22 +121,22 @@ void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publis
     float proportional;
     while(abs(targetHeading - yaw) > rotationTolerance){
         // Calculate the angular velocity based on PN control algorithm
-        proportional = kp_r*(targetHeading-yaw);
-        if(proportional < 0){
-            angular = (float) pow(-1*proportional, kn_r);
-        }
-        else{
-            angular = (float) pow(proportional, kn_r);
-        }
+        // proportional = kp_r*(targetHeading-yaw);
+        // if(proportional < 0){
+        //     angular = (float) pow(-1*proportional, kn_r);
+        // }
+        // else{
+        //     angular = (float) pow(proportional, kn_r);
+        // }
 
-        // Adjust angular to not be above or below the threshold
-        if(angular > maxAngular){
-            angular = maxAngular;
-        }
-        else if(angular < minAngular){
-            angular = minAngular;
-        }
-        angular = Deg2Rad(angular);
+        // // Adjust angular to not be above or below the threshold
+        // if(angular > maxAngular){
+        //     angular = maxAngular;
+        // }
+        // else if(angular < minAngular){
+        //     angular = minAngular;
+        // }
+        angular = computeAngular(targetHeading, yaw);
 
         ros::spinOnce();
         vel.angular.z = angular;
@@ -104,21 +150,6 @@ void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publis
     vel.linear.x = 0;
     vel_pub.publish(vel);
 
-}
-
-
-void rotateEndlessly(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
-    ROS_INFO("ROTATE ENDLESS CALLED");
-    while(true){
-        // angular = Deg2Rad(std::max((float) pow(kp_r*(targetHeading-yaw), kn_r), minAngular));
-        ros::spinOnce();
-
-        vel.angular.z = Deg2Rad(20);
-        vel.linear.x = 0;
-        vel_pub.publish(vel);
-
-        ROS_INFO("Target/Current Yaw: %f degs", yaw);
-    }
 }
 
 
@@ -140,22 +171,18 @@ void navigateToPosition(float x, float y, geometry_msgs::Twist &vel, ros::Publis
         dx = x-posX;
         dy = y-posY;
         d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
-        targetHeading = Rad2Deg(atan2(dy, dx));
 
-        // angular = Deg2Rad((float) pow(kp_r*(targetHeading-yaw), kn_r));
         linear = (float) pow(kp_n*d, kn_n);
-        if(linear > maxLinear){
-            linear = maxLinear;
-        }
-        else if(linear < minLinear){
-            linear = minLinear;
-        }
+        applyMagnitudeLimits(linear, minLinear, maxLinear);
+
+        targetHeading = Rad2Deg(atan2(dy, dx));
+        angular = computeAngular(targetHeading, yaw);
 
         vel.angular.z = 0;
         vel.linear.x = linear;
         vel_pub.publish(vel);
 
-        ROS_INFO("Tgt X/Y: %f/%f | Pos X/Y: %f/%f | Lin/Ang: %f/%f", x, y, posX, posY, linear, angular);
+        ROS_INFO("Tgt X/Y: %f/%f | Pos X/Y: %f/%f | Lin/Ang: %f/%f", x, y, posX, posY, linear, Rad2Deg(angular));
     }
 
     linear = 0;
