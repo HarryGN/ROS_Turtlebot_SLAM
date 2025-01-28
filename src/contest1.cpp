@@ -1,4 +1,3 @@
-//PERCY
 #include <ros/console.h>
 #include "ros/ros.h"
 #include <geometry_msgs/Twist.h>
@@ -23,6 +22,11 @@ float angular;
 float linear;
 float posX = 0.0, posY = 0.0, yaw = 0.0;
 
+float minLaserDist = std::numeric_limits<float>::infinity();
+
+float left_distance = 0.0, right_distance = 0.0, front_distance = 0.0;
+// float maxLaserDist = std::numeric_limits<float>::();
+int32_t nLasers=0, desiredNLasers=0, desiredAngle=5;
 
 float rotationTolerance = Deg2Rad(1);
 float kp_r = 1;
@@ -52,16 +56,53 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
-	//fill with your code
+    minLaserDist = std::numeric_limits<float>::infinity();
+    // maxLaserDist = std::numeric_limits<float>::infinity();
+    nLasers = (msg->angle_max - msg->angle_min) / msg->angle_increment;
+    // desiredNLasers = desiredAngle*M_PI / (180*msg->angle_increment);
+
+    // Get the indices for first, middle, and last readings
+    int left_idx = 0;                 // First reading (left)
+    int front_idx = nLasers / 2;      // Middle reading (front)
+    int right_idx = nLasers - 1;      // Last reading (right)
+    
+    float right_distance = msg->ranges[left_idx];
+    float front_distance = msg->ranges[front_idx];
+    float left_distance = msg->ranges[right_idx];
+
+    // Log the results
+    ROS_INFO("Left (first) distance: %.2f m", left_distance);
+    ROS_INFO("Front (middle) distance: %.2f m", front_distance);
+    ROS_INFO("Right (last) distance: %.2f m", right_distance);
+    
+    // if (desiredAngle * M_PI / 180 < msg->angle_max && -desiredAngle * M_PI / 180 > msg->angle_min) {
+    //     for (uint32_t laser_idx = nLasers / 2 - desiredNLasers; laser_idx < nLasers / 2 + desiredNLasers; ++laser_idx){
+    //         minLaserDist = std::min(minLaserDist, msg->ranges[laser_idx]);
+    //     }
+    // }
+    // else {
+    //     for (uint32_t laser_idx = 0; laser_idx < nLasers; ++laser_idx) {
+    //          std::min(minLaserDist, msg->ranges[laser_idx]);
+    //     }
+    // }
+
+    // ROS_INFO("Min distance: %i", minLaserDist);
 }
 
-void callbackOdom(const nav_msgs::Odometry::ConstPtr& msg)
+void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
 {
     posX = msg->pose.pose.position.x;
     posY = msg->pose.pose.position.y;
-    yaw = Rad2Deg(tf::getYaw(msg->pose.pose.orientation));
-    //ROS_INFO("Position: (%f, %f) Orientation: %f rad or %f degrees.", posX, posY, yaw, Rad2Deg(yaw));
+    yaw = tf::getYaw(msg->pose.pose.orientation);
+   
 }
+// void callbackOdom(const nav_msgs::Odometry::ConstPtr& msg)
+// {
+//     posX = msg->pose.pose.position.x;
+//     posY = msg->pose.pose.position.y;
+//     yaw = Rad2Deg(tf::getYaw(msg->pose.pose.orientation));
+//     //ROS_INFO("Position: (%f, %f) Orientation: %f rad or %f degrees.", posX, posY, yaw, Rad2Deg(yaw));
+// }
 
 float absPow(float base, float exp){
     if(base < 0){
@@ -177,12 +218,13 @@ void navigateToPosition(float x, float y, geometry_msgs::Twist &vel, ros::Publis
 
 int main(int argc, char **argv)
 {
+    
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
 
     ros::Subscriber bumper_sub = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
     ros::Subscriber laser_sub = nh.subscribe("scan", 10, &laserCallback);
-    ros::Subscriber subOdom = nh.subscribe("odom", 1, &callbackOdom);
+    ros::Subscriber odom = nh.subscribe("odom", 1, odomCallback); 
 
     ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
 
@@ -212,17 +254,17 @@ int main(int argc, char **argv)
 
     // rotateToHeading(90, vel, vel_pub);
     // rotateEndlessly(vel, vel_pub);
-    navigateToPosition(-1.929,1.346, vel, vel_pub);
-    navigateToPosition(-1.7069999999999999,-1.0, vel, vel_pub);
-    navigateToPosition(-0.8680000000000001,1.4365, vel, vel_pub);
-    navigateToPosition(-0.3763333333333332,-1.1406666666666667, vel, vel_pub);
-    navigateToPosition(0.19299999999999984,1.5270000000000001, vel, vel_pub);
-    navigateToPosition(0.9543333333333335,-1.2813333333333332, vel, vel_pub);
-    navigateToPosition(1.2539999999999998,1.6175, vel, vel_pub);
-    navigateToPosition(2.285,-1.422, vel, vel_pub);
-    navigateToPosition(2.3149999999999995,1.708, vel, vel_pub);
+    // navigateToPosition(-1.929,1.346, vel, vel_pub);
+    // navigateToPosition(-1.7069999999999999,-1.0, vel, vel_pub);
+    // navigateToPosition(-0.8680000000000001,1.4365, vel, vel_pub);
+    // navigateToPosition(-0.3763333333333332,-1.1406666666666667, vel, vel_pub);
+    // navigateToPosition(0.19299999999999984,1.5270000000000001, vel, vel_pub);
+    // navigateToPosition(0.9543333333333335,-1.2813333333333332, vel, vel_pub);
+    // navigateToPosition(1.2539999999999998,1.6175, vel, vel_pub);
+    // navigateToPosition(2.285,-1.422, vel, vel_pub);
+    // navigateToPosition(2.3149999999999995,1.708, vel, vel_pub);
 
-    while(ros::ok() && secondsElapsed <= 480) {
+    while(ros::ok()) {
         ros::spinOnce();
         
         #pragma region Bumper
@@ -232,15 +274,10 @@ int main(int argc, char **argv)
             tBumperEventStart = secondsElapsed;
         }
 
-<<<<<<< HEAD:src/contest1_harry.cpp
-            if (left_distance < target_distance) {
-                angular = -k * std::exp(-alpha * left_distance); // Exponential decay for left turns
-                linear = 0.2;                                   // Set a constant forward speed
-            } 
-            else if (left_distance > target_distance) {
-                angular = -k * std::exp(alpha * left_distance);  // Exponential decay for right turns
-                linear = 0.2;                                   // Set a constant forward speed
-=======
+        const double k = 0.1;   // Scaling factor for angular velocity
+        const double alpha = 0.5; // Exponential growth/decay rate
+        float target_distance = 1.5;
+
         if(bumperStepBack){
             uint64_t dBumperEventRemaining = secondsElapsed - tBumperEventStart;
 
@@ -257,7 +294,6 @@ int main(int argc, char **argv)
             else if(dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2]){
                 linear = 0.1;
                 angular = 0.0;
->>>>>>> Percy:src/contest1.cpp
             } 
             
             else if (dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2] + dBumperEvent[3]){
@@ -272,6 +308,38 @@ int main(int argc, char **argv)
             }
         }
         #pragma endregion
+
+        else if(front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)){
+            ROS_INFO("Right Wall Following");
+            if (left_distance < target_distance || left_distance > target_distance) {
+                ros::spinOnce();
+
+                linear = 0.2;
+                ROS_INFO("Linear: %i", linear);
+                
+                
+                angular = -k * std::exp(alpha * left_distance);  // Exponential decay for right turns
+
+            // } 
+            // else if (left_distance > target_distance) {
+            //     angular = -k * std::exp(alpha * left_distance);  // Exponential decay for right turns
+            //     linear = (float) pow(kp_n*front_distance, kn_n);
+            //     ROS_INFO("Linear: %i", linear);
+            // }
+
+            }
+
+            else{
+                angular = 0.0;                                  // No angular adjustment
+                linear = 0.2;
+            }
+            }
+        
+        else{
+            ROS_INFO("Adjusting position");
+            linear = 0.0;
+            angular = 0.2;                     // Rotate in place to adjust to right
+        }
 
         vel.angular.z = angular;
         vel.linear.x = linear;
