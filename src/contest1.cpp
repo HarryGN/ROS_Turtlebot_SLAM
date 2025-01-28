@@ -48,6 +48,27 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
     centerBumperPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
     rightBumperPressed = bumper[kobuki_msgs::BumperEvent::RIGHT];
     ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", leftBumperPressed, centerBumperPressed, rightBumperPressed);
+
+    if (leftBumperPressed || centerBumperPressed || rightBumperPressed) {
+        // Get the current position from odometry or other source
+        geometry_msgs::PoseStamped pose;
+        pose.header.stamp = ros::Time::now();
+        pose.header.frame_id = "map"; // or "odom" depending on your frame
+
+        // Set the position (example values, replace with actual position)
+        pose.pose.position.x = 1.0;
+        pose.pose.position.y = 2.0;
+        pose.pose.position.z = 0.0;
+
+        // Set the orientation (example values, replace with actual orientation)
+        pose.pose.orientation.x = 0.0;
+        pose.pose.orientation.y = 0.0;
+        pose.pose.orientation.z = 0.0;
+        pose.pose.orientation.w = 1.0;
+
+        // Publish the pose
+        pose_pub.publish(pose);
+    }
 }
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
