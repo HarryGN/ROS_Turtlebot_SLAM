@@ -15,23 +15,29 @@
 
 #include <math.h>
 
+#define N_BUMPER (3)
+#define Rad2Deg(rad) ((rad) * 180. / M_PI)
+#define Deg2Rad(deg) ((deg) * M_PI / 180.)
+
 float angular;
 float linear;
 float posX = 0.0, posY = 0.0, yaw = 0.0;
+float rotationTolerance = Deg2Rad(1);
+float kp_r = 1;
+float kn_r = 0.7;
+float minAngular = 4; // Degrees per second
+float maxAngular = 30; // Degrees per second
+
+float navigationTolerance = 0.2;
+float kp_n = 0.02;
+float kn_n = 0.5;
+float minLinear = 0.05;
+float maxLinear = 0.2;
 
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 bool leftBumperPressed;
 bool centerBumperPressed;
 bool rightBumperPressed;
-
-#define N_BUMPER (3)
-#define RAD2DEG(rad) ((rad) * 180. / M_PI)
-#define DEG2RAD(deg) ((deg) * M_PI / 180.)
-
-float Deg2Rad(float degrees) {
-    return degrees * (M_PI / 180);
-}
-
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
 {
@@ -51,9 +57,116 @@ void callbackOdom(const nav_msgs::Odometry::ConstPtr& msg)
 {
     posX = msg->pose.pose.position.x;
     posY = msg->pose.pose.position.y;
-    yaw = tf::getYaw(msg->pose.pose.orientation);
-    //ROS_INFO("Position: (%f, %f) Orientation: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
+    yaw = Rad2Deg(tf::getYaw(msg->pose.pose.orientation));
+    //ROS_INFO("Position: (%f, %f) Orientation: %f rad or %f degrees.", posX, posY, yaw, Rad2Deg(yaw));
+
+    if(!posX==posX || !posY==posY || !yaw==yaw ){
+        ROS_INFO("NAN ERROR");
+        while(true){
+            continue;
+        }
+    }
 }
+
+void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+    ROS_INFO("ROTATE TO HEADING CALLED");
+    ros::spinOnce();
+
+    float proportional;
+    while(abs(targetHeading - yaw) > rotationTolerance){
+        // Calculate the angular velocity based on PN control algorithm
+        proportional = kp_r*(targetHeading-yaw);
+        if(proportional < 0){
+            angular = (float) pow(-1*proportional, kn_r);
+        }
+        else{
+            angular = (float) pow(proportional, kn_r);
+        }
+
+        // Adjust angular to not be above or below the threshold
+        if(angular > maxAngular){
+            angular = maxAngular;
+        }
+        else if(angular < minAngular){
+            angular = minAngular;
+        }
+        angular = Deg2Rad(angular);
+
+        ros::spinOnce();
+        vel.angular.z = angular;
+        vel.linear.x = 0;
+        vel_pub.publish(vel);
+
+        ROS_INFO("Target/Current Yaw: %f/%f degs | Setpoint: %f degs/s", targetHeading, yaw, Rad2Deg(angular));
+    }
+
+    vel.angular.z = 0;
+    vel.linear.x = 0;
+    vel_pub.publish(vel);
+
+}
+
+
+void rotateEndlessly(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+    ROS_INFO("ROTATE ENDLESS CALLED");
+    while(true){
+        // angular = Deg2Rad(std::max((float) pow(kp_r*(targetHeading-yaw), kn_r), minAngular));
+        ros::spinOnce();
+
+        vel.angular.z = Deg2Rad(20);
+        vel.linear.x = 0;
+        vel_pub.publish(vel);
+
+        ROS_INFO("Target/Current Yaw: %f degs", yaw);
+    }
+}
+
+
+void navigateToPosition(float x, float y, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+    ROS_INFO("navigateToPosition() CALLED");
+    ros::spinOnce();
+    
+    float dx = x-posX;
+    float dy = y-posY;
+    float d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
+
+    // Set and rotate to initial heading
+    float targetHeading = Rad2Deg(atan2(dy, dx));
+    rotateToHeading(targetHeading, vel, vel_pub);
+
+    // While loop until robot gets there
+    while(d > navigationTolerance){
+        ros::spinOnce();
+        dx = x-posX;
+        dy = y-posY;
+        d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
+        targetHeading = Rad2Deg(atan2(dy, dx));
+
+        // angular = Deg2Rad((float) pow(kp_r*(targetHeading-yaw), kn_r));
+        linear = (float) pow(kp_n*d, kn_n);
+        if(linear > maxLinear){
+            linear = maxLinear;
+        }
+        else if(linear < minLinear){
+            linear = minLinear;
+        }
+
+        vel.angular.z = 0;
+        vel.linear.x = linear;
+        vel_pub.publish(vel);
+
+        ROS_INFO("Tgt X/Y: %f/%f | Pos X/Y: %f/%f | Lin/Ang: %f/%f", x, y, posX, posY, linear, angular);
+    }
+
+    linear = 0;
+    angular = 0;
+    vel.angular.z = angular;
+    vel.linear.x = 0;
+    vel_pub.publish(vel);
+
+    ROS_INFO("Successful exit from navigateToPosition.");
+}
+
 
 int main(int argc, char **argv)
 {
@@ -88,12 +201,24 @@ int main(int argc, char **argv)
 
 
     angular = 0.0;
-    linear = 0.1;
+    linear = 0.0;
+
+    // rotateToHeading(90, vel, vel_pub);
+    // rotateEndlessly(vel, vel_pub);
+    navigateToPosition(-1.929,1.346, vel, vel_pub);
+    navigateToPosition(-1.7069999999999999,-1.0, vel, vel_pub);
+    navigateToPosition(-0.8680000000000001,1.4365, vel, vel_pub);
+    navigateToPosition(-0.3763333333333332,-1.1406666666666667, vel, vel_pub);
+    navigateToPosition(0.19299999999999984,1.5270000000000001, vel, vel_pub);
+    navigateToPosition(0.9543333333333335,-1.2813333333333332, vel, vel_pub);
+    navigateToPosition(1.2539999999999998,1.6175, vel, vel_pub);
+    navigateToPosition(2.285,-1.422, vel, vel_pub);
+    navigateToPosition(2.3149999999999995,1.708, vel, vel_pub);
 
     while(ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
         
-
+        #pragma region Bumper
         // Bumper Event
         if(leftBumperPressed || centerBumperPressed || rightBumperPressed){
             bumperStepBack = true;
@@ -129,6 +254,7 @@ int main(int argc, char **argv)
                 linear = 0.1;
             }
         }
+        #pragma endregion
 
         vel.angular.z = angular;
         vel.linear.x = linear;
