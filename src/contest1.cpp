@@ -103,18 +103,18 @@ int main(int argc, char **argv)
         //fill with your code
         // Check if any of the bumpers were pressed.
         bool any_bumper_pressed = false;
-        float target_distance = 1.5;
+        float target_distance = 0.9;
        if (front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)) {
     
-            const double k = 0.1;   // Scaling factor for angular velocity
-            const double alpha = 0.5; // Exponential growth/decay rate
+            const double k = 0.15;   // Scaling factor for angular velocity
+            const double alpha = 1.5; // Exponential growth/decay rate
 
             if (left_distance < target_distance) {
-                angular = -k * std::exp(-alpha * left_distance); // Exponential decay for left turns
+                angular = -k * std::(1-exp(-alpha * left_distance)); // Exponential decay for left turns
                 linear = 0.1;                                   // Set a constant forward speed
             } 
             else if (left_distance > target_distance) {
-                angular = -k * std::exp(alpha * left_distance);  // Exponential decay for right turns
+                angular = k * std::(1-exp(-alpha * left_distance));  // Exponential decay for right turns
                 linear = 0.1;                                   // Set a constant forward speed
             } 
             else {
@@ -123,8 +123,8 @@ int main(int argc, char **argv)
             }
        }
         else {
-            linear = 0.0;
-            angular = 0.4;                     // Rotate in place to adjust to right
+            linear = 0.04;
+            angular = -0.26;                     // Rotate in place to adjust to right
         }
         vel.angular.z = angular;
         vel.linear.x = linear;
