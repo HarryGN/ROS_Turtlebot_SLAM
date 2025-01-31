@@ -26,6 +26,9 @@ float left_distance = 0.0, right_distance = 0.0, front_distance = 0.0;
 // float maxLaserDist = std::numeric_limits<float>::();
 int32_t nLasers=0, desiredNLasers=0, desiredAngle=5;
 
+// Create a vector to store positions
+std::vector<std::pair<double, double>> positions;
+
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
 {
 	bumper[msg->bumper] = msg->state;
@@ -36,7 +39,7 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
     posX = msg->pose.pose.position.x;
     posY = msg->pose.pose.position.y;
     yaw = tf::getYaw(msg->pose.pose.orientation);
-   
+    ROS_INFO("(x,y):(%f,%f) Orint: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
 }
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
@@ -71,8 +74,25 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         }
     }
 
-    ROS_INFO("Min distance: %i", minLaserDist);
+    //ROS_INFO("Min distance: %i", minLaserDist);
 }
+
+// Store the current coordinates in the vector
+void get_coord() { 
+    positions.push_back(std::make_pair(posX, posY)); 
+    ROS_INFO("Stored coordinates: (%f, %f)", posX, posY); 
+}
+
+// Check if the same place is visited
+bool is_position_visited(double x, double y, double threshold = 0.05) {
+    for (const auto& coord : positions) {
+        if (std::abs(coord.first - x) < threshold && std::abs(coord.second - y) < threshold) {
+            return true; // Position has been visited
+        }
+    }
+    return false; // Position has not been visited
+}
+
 
 int main(int argc, char **argv)
 {
@@ -100,28 +120,37 @@ int main(int argc, char **argv)
     while(ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
         // ROS_INFO("Postion: (%f, %f) Orientation: %f degrees Range: %f", posX, posY, yaw*180/pi, maxLaserRange);
-        //fill with your code
         // Check if any of the bumpers were pressed.
+
+        get_coord();  //store positions
+
+        // Check if the robot has returned to a previous position
+        // Then start zig-zag. Need to incorporate
+        if (is_position_visited(posX, posY)) {
+            ROS_INFO("Robot has returned to a previously visited position.");
+	        break;  // Stop the loop if visited position
+        }
+
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
-       if (front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)) {
+        if (front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)) {
     
             const double k = 0.15;   // Scaling factor for angular velocity
             const double alpha = 1.5; // Exponential growth/decay rate
 
             if (left_distance < target_distance) {
-                angular = -k * std::(1-exp(-alpha * left_distance)); // Exponential decay for left turns
+                angular = -k * (1-exp(-alpha * left_distance)); // Exponential decay for left turns
                 linear = 0.1;                                   // Set a constant forward speed
             } 
             else if (left_distance > target_distance) {
-                angular = k * std::(1-exp(-alpha * left_distance));  // Exponential decay for right turns
+                angular = k * (1-exp(-alpha * left_distance));  // Exponential decay for right turns
                 linear = 0.1;                                   // Set a constant forward speed
             } 
             else {
                 angular = 0.0;                                  // No angular adjustment
                 linear = 0.1;                                   // Maintain forward speed
             }
-       }
+        }
         else {
             linear = 0.04;
             angular = -0.26;                     // Rotate in place to adjust to right
