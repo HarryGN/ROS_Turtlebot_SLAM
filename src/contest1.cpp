@@ -39,7 +39,8 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
     posX = msg->pose.pose.position.x;
     posY = msg->pose.pose.position.y;
     yaw = tf::getYaw(msg->pose.pose.orientation);
-    ROS_INFO("(x,y):(%f,%f) Orint: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
+    //ROS_INFO("(x,y):(%f,%f) Orint: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
+    ROS_INFO("(x,y):(%f,%f).", posX, posY);
 }
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
@@ -59,9 +60,9 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     left_distance = msg->ranges[left_idx];
 
     // Log the results
-    ROS_INFO("Left (first) distance: %.2f m", left_distance);
-    ROS_INFO("Front (middle) distance: %.2f m", front_distance);
-    ROS_INFO("Right (last) distance: %.2f m", right_distance);
+    //ROS_INFO("Left (first) distance: %.2f m", left_distance);
+    //ROS_INFO("Front (middle) distance: %.2f m", front_distance);
+    //ROS_INFO("Right (last) distance: %.2f m", right_distance);
     
     if (desiredAngle * M_PI / 180 < msg->angle_max && -desiredAngle * M_PI / 180 > msg->angle_min) {
         for (uint32_t laser_idx = nLasers / 2 - desiredNLasers; laser_idx < nLasers / 2 + desiredNLasers; ++laser_idx){
@@ -77,11 +78,71 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     //ROS_INFO("Min distance: %i", minLaserDist);
 }
 
-// Store the current coordinates in the vector
-void get_coord() { 
-    positions.push_back(std::make_pair(posX, posY)); 
-    ROS_INFO("Stored coordinates: (%f, %f)", posX, posY); 
+// Store coordinates every second and print the list
+// void store_coordinates(const ros::TimerEvent&)
+// {
+//     // Store the current coordinates
+//     positions.push_back(std::make_pair(posX, posY));
+//     ROS_INFO("Stored coordinates: (%f, %f)", posX, posY);
+
+//     // Display the full list of stored coordinates
+//     ROS_INFO("Current list of stored coordinates:");
+//     for (const auto& coord : positions) {
+//         ROS_INFO("X: %.2f, Y: %.2f", coord.first, coord.second);
+//     }
+// }
+
+// Store the current coordinates in the position vector
+void get_coord() {
+    bool is_visited = false;
+    for (const auto& coord : positions) {
+        if (std::abs(coord.first - posX) < 0.05 && std::abs(coord.second - posY) < 0.05) {
+            is_visited = true;
+            break;
+        }
+    }
+
+    if (!is_visited) {
+        positions.push_back(std::make_pair(posX, posY)); // Only store new coordinates
+        ROS_INFO("Stored coordinates: (%f, %f)", posX, posY);
+    } else {
+        ROS_INFO("Coordinates (%f, %f) already visited, not storing again.", posX, posY);
+    }
+
+    // Display the full list of stored coordinates
+    ROS_INFO("Current list of stored coordinates:");
+    for (const auto& coord : positions) {
+        ROS_INFO("X: %.2f, Y: %.2f", coord.first, coord.second);
+    }
 }
+
+// Calculate Euclidean distance between two points
+double calculate_distance(const std::pair<double, double>& p1, const std::pair<double, double>& p2) {
+    return std::sqrt(std::pow(p2.first - p1.first, 2) + std::pow(p2.second - p1.second, 2));
+}
+
+// Function to find the corner coordinates with the largest distance between them
+std::pair<std::pair<double, double>, std::pair<double, double>> filter_corner() {
+    double max_distance = 0.0;
+    std::pair<double, double> corner1, corner2;
+
+    // Iterate through all pairs of coordinates to find the maximum distance
+    for (size_t i = 0; i < positions.size(); ++i) {
+        for (size_t j = i + 1; j < positions.size(); ++j) {
+            double distance = calculate_distance(positions[i], positions[j]);
+
+            if (distance > max_distance) {
+                max_distance = distance;
+                corner1 = positions[i];
+                corner2 = positions[j];
+            }
+        }
+    }
+
+    // Return the two corner coordinates that are the farthest apart
+    return std::make_pair(corner1, corner2);
+}
+
 
 // Check if the same place is visited
 bool is_position_visited(double x, double y, double threshold = 0.05) {
@@ -104,8 +165,10 @@ int main(int argc, char **argv)
     ros::Subscriber odom = nh.subscribe("odom", 1, odomCallback); 
 
     ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
-
     ros::Rate loop_rate(10);
+
+    // // Create a timer to call store_coordinates every second 
+    // ros::Timer timer = nh.createTimer(ros::Duration(1.0), store_coordinates);
 
     geometry_msgs::Twist vel;
 
@@ -123,13 +186,10 @@ int main(int argc, char **argv)
         // Check if any of the bumpers were pressed.
 
         get_coord();  //store positions
-
-        // Check if the robot has returned to a previous position
-        // Then start zig-zag. Need to incorporate
-        if (is_position_visited(posX, posY)) {
-            ROS_INFO("Robot has returned to a previously visited position.");
-	        break;  // Stop the loop if visited position
-        }
+        std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
+        // Print corner coord
+        ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
+        ROS_INFO("Corner 2: (%.2f, %.2f)", corners.second.first, corners.second.second);
 
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
@@ -161,6 +221,13 @@ int main(int argc, char **argv)
         // The last thing to do is to update the timer.
         secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
         loop_rate.sleep();
+
+        // Check if the robot has returned to a previous position
+        // Then start zig-zag. Need to incorporate
+        // if (is_position_visited(posX, posY)) {
+        //     ROS_INFO("Robot has returned to a previously visited position.");
+	    //     break;  // Stop the loop if visited position
+        // }
     }
 
     return 0;
