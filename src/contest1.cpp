@@ -5,6 +5,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_datatypes.h>
+#include <visualization_msgs/Marker.h>
 
 #include <unordered_map>
 #include <cmath>
@@ -28,6 +29,7 @@ double posX = 0., posY = 0., yaw = 0.;
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 LaserScanData laser_data;
 ros::Publisher pose_pub;
+ros::Publisher marker_pub;
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg) {
     bumper[msg->bumper] = msg->state;
@@ -52,6 +54,28 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg) {
 
         // Publish the pose
         pose_pub.publish(pose);
+
+        // Create and publish a marker
+        visualization_msgs::Marker marker;
+        marker.header.frame_id = "map"; // or "odom" depending on your frame
+        marker.header.stamp = ros::Time::now();
+        marker.ns = "bumper_markers";
+        marker.id = msg->bumper; // Use bumper ID to differentiate markers
+        marker.type = visualization_msgs::Marker::SPHERE;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.pose.position.x = posX;
+        marker.pose.position.y = posY;
+        marker.pose.position.z = 0.0;
+        marker.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
+        marker.scale.x = 0.2; // Size of the marker
+        marker.scale.y = 0.2;
+        marker.scale.z = 0.2;
+        marker.color.a = 1.0; // Alpha
+        marker.color.r = 1.0; // Red
+        marker.color.g = 0.0; // Green
+        marker.color.b = 0.0; // Blue
+
+        marker_pub.publish(marker);
     }
 }
 
@@ -120,6 +144,7 @@ int main(int argc, char **argv) {
     ros::Subscriber odom_sub = nh.subscribe("odom", 1, odomCallback);
 
     pose_pub = nh.advertise<geometry_msgs::PoseStamped>("robot_pose", 10);
+    marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 10);
     ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
     ros::Rate loop_rate(10);
 
