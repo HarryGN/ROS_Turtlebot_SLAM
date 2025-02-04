@@ -44,6 +44,40 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     int front_idx = nLasers / 2;
     int left_idx = nLasers - 1;
 
+    laser_data.left_distance = msg->ranges[left_idx];
+    laser_data.front_distance = msg->ranges[front_idx];
+    laser_data.right_distance = msg->ranges[right_idx];
+
+    // int i = left_idx-1;
+    while(std::isnan(laser_data.left_distance)){
+        laser_data.left_distance = msg->ranges[left_idx];
+        left_idx--;
+    }
+
+    // i = right_idx+1;
+    while(std::isnan(laser_data.right_distance)){
+        laser_data.right_distance = msg->ranges[right_idx];
+        right_idx++;
+    }
+
+
+    int i = 1;
+    bool odd = true;
+
+    while(std::isnan(laser_data.front_distance)){
+        laser_data.front_distance = msg->ranges[front_idx+i];
+        if(odd){
+            odd = false;
+            i = -(i);
+        }
+        else{
+            odd = true;
+            i = -(i+1)
+        }
+    }
+
+    front_idx += i;
+
     // Helper function to compute the average of three rays, handling NaNs
     auto avg_range = [&](int idx) -> float {
         float sum = 0.0;
@@ -66,9 +100,9 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     };
 
     // Store processed values in the struct
-    laser_data.left_distance = avg_range(left_idx);
-    laser_data.front_distance = avg_range(front_idx);
-    laser_data.right_distance = avg_range(right_idx);
+    // laser_data.left_distance = avg_range(left_idx);
+    // laser_data.front_distance = avg_range(front_idx);
+    // laser_data.right_distance = avg_range(right_idx);
 
     // Compute min distance while ignoring NaNs
     laser_data.min_distance = std::numeric_limits<float>::infinity();
