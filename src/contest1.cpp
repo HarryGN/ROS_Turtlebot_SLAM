@@ -99,43 +99,49 @@ int main(int argc, char **argv) {
     uint64_t secondsElapsed = 0;
 
     const float target_distance = 0.9;
+    const float safe_threshold = 1.0;  // Safe distance threshold
     const double k = 0.15;   // Scaling factor for angular velocity
     const double alpha = 1.5; // Exponential growth/decay rate
+    const float max_speed = 0.25;  // Max linear speed
+    const float min_speed = 0.1;   // Min linear speed
 
     while (ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
 
-        // Ensure all distances are valid before proceeding
-        if (!std::isnan(laser_data.front_distance) && 
-            !std::isnan(laser_data.left_distance) && 
-            !std::isnan(laser_data.right_distance)) 
-        {
-            if (laser_data.front_distance > 1.0) {
-                if (laser_data.left_distance < target_distance) {
-                    vel.angular.z = -k * (1 - exp(-alpha * laser_data.left_distance)); // Exponential decay for left turns
-                    vel.linear.x = 0.1;  
-                } 
-                else if (laser_data.left_distance > target_distance) {
-                    vel.angular.z = k * (1 - exp(-alpha * laser_data.left_distance));  // Exponential decay for right turns
-                    vel.linear.x = 0.1;  
-                } 
-                else {
-                    vel.angular.z = 0.0;  
-                    vel.linear.x = 0.1;  
-                }
+        float front_dist = std::isnan(laser_data.front_distance) ? safe_threshold : laser_data.front_distance;
+        float left_dist = std::isnan(laser_data.left_distance) ? safe_threshold : laser_data.left_distance;
+        float right_dist = std::isnan(laser_data.right_distance) ? safe_threshold : laser_data.right_distance;
+
+        // Find the closest obstacle
+        float closest_obstacle = std::min({front_dist, left_dist, right_dist});
+
+        // Dynamic speed control
+        if (closest_obstacle >= safe_threshold) {
+            vel.linear.x = max_speed;  // If no nearby obstacles, move at max speed
+        } else {
+            // Linearly interpolate speed between min_speed and max_speed based on obstacle proximity
+            vel.linear.x = min_speed + (max_speed - min_speed) * ((closest_obstacle - target_distance) / (safe_threshold - target_distance));
+            vel.linear.x = std::max(static_cast<double>(min_speed),std::min(static_cast<double>(max_speed), vel.linear.x));
+
+        }
+
+        if (front_dist > 1.0) {
+            if (left_dist < target_distance) {
+                vel.angular.z = -k * (1 - exp(-alpha * left_dist)); // Exponential decay for left turns
+            } 
+            else if (left_dist > target_distance) {
+                vel.angular.z = k * (1 - exp(-alpha * left_dist));  // Exponential decay for right turns
             } 
             else {
-                vel.linear.x = 0.04;
-                vel.angular.z = -0.26;  // Rotate in place to adjust to the right
+                vel.angular.z = 0.0;  
             }
         } 
         else {
-            // If sensor data is unreliable, stop movement
-            vel.linear.x = 0.0;
-            vel.angular.z = 0.0;
-            ROS_WARN("Laser scan data contains NaNs, stopping movement.");
+            vel.linear.x = min_speed; // Reduce speed when too close to an obstacle
+            vel.angular.z = -0.26;    // Rotate in place to adjust to the right
         }
 
+        // Publish velocity
         vel_pub.publish(vel);
 
         // Update the timer
