@@ -23,10 +23,18 @@ struct LaserScanData {
     float min_distance;
 };
 
+struct OrthogonalDist {
+    float left_distance;
+    float front_distance;
+    float right_distance;
+};
+
 // Global Variables
 double posX = 0., posY = 0., yaw = 0.;
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 LaserScanData laser_data;
+OrthogonalDist orthogonal_dist;
+float full_angle = 57;
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg) {
     bumper[msg->bumper] = msg->state;
@@ -36,6 +44,14 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
     posX = msg->pose.pose.position.x;
     posY = msg->pose.pose.position.y;
     yaw = tf::getYaw(msg->pose.pose.orientation);
+    // //ROS_INFO("(x,y):(%f,%f) Orint: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
+    // ROS_INFO("(x,y):(%f,%f).", posX, posY);
+}
+
+void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist) {
+    float angle = (float) ind / (float) nLasers * full_angle + 90 - full_angle / 2;
+    horz_dist = distance * std::cos(Deg2Rad(angle));
+    front_dist = distance * std::sin(Deg2Rad(angle));
 }
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
@@ -48,6 +64,12 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     laser_data.front_distance = msg->ranges[front_idx];
     laser_data.right_distance = msg->ranges[right_idx];
 
+    // orthogonal_dist.front_distance = laser_data.front_distance
+    // orthogonal_dist.left_distance = laser_data.left_distance
+    // orthogonal_dist.right_distance = laser_data.right_distance
+
+    // orthogonalizeRay(left_idx, nLasers, laser_data.left_distance, orthogonal_dist.left_distance, orthogonal_dist.front_distance);
+    
     // int i = left_idx-1;
     while(std::isnan(laser_data.left_distance)){
         laser_data.left_distance = msg->ranges[left_idx];
@@ -72,7 +94,7 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
         }
         else{
             odd = true;
-            i = -(i+1)
+            i = -(i+1);
         }
     }
 
@@ -117,6 +139,39 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
              laser_data.right_distance, laser_data.min_distance);
 }
 
+// Define an enumeration for wall side
+enum WallSide { LEFT, RIGHT };
+
+// Function to perform wall-following logic
+void wallFollowing(WallSide wall_side, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha) {
+    // **Wall-Following Logic**
+    if (front_dist > 1.0) {
+        if (wall_side == LEFT) {
+            // Follow the left wall
+            if (left_dist < target_distance) {
+                vel.angular.z = -k * (1 - exp(-alpha * left_dist)); // Adjust right
+            } else if (left_dist > target_distance) {
+                vel.angular.z = k * (1 - exp(-alpha * left_dist));  // Adjust left
+            } else {
+                vel.angular.z = 0.0;  // No adjustment needed
+            }
+        } else if (wall_side == RIGHT) {
+            // Follow the right wall
+            if (right_dist < target_distance) {
+                vel.angular.z = k * (1 - exp(-alpha * right_dist)); // Adjust left
+            } else if (right_dist > target_distance) {
+                vel.angular.z = -k * (1 - exp(-alpha * right_dist)); // Adjust right
+            } else {
+                vel.angular.z = 0.0;  // No adjustment needed
+            }
+        }
+    } else {
+        // Obstacle detected in front, slow down and turn
+        vel.linear.x = min_speed; // Slow down
+        vel.angular.z = (wall_side == LEFT) ? -0.26 : 0.26; // Turn away from the wall
+    }
+}
+
 int main(int argc, char **argv) {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
@@ -138,6 +193,11 @@ int main(int argc, char **argv) {
     const double alpha = 1.5; // Exponential growth/decay rate
     const float max_speed = 0.25;  // Max linear speed
     const float min_speed = 0.1;   // Min linear speed
+    float current_x;
+    float current_y;
+    float delta_x;
+    float delta_y;
+    int corridor_count = 0;
 
     // 全局变量：存储上一帧的左/右激光读数
     float prev_left_distance = 0.0, prev_right_distance = 0.0;
@@ -170,15 +230,43 @@ int main(int argc, char **argv) {
         float right_change = right_dist - prev_right_distance;
 
         if (left_change > corridor_threshold) {
-            // 计算旋转角度 (限制 30° ~ 90°)
+            // Calculate rotation angle (clamped between min_rotation and max_rotation)
             float rotation_angle_deg = min_rotation + (left_change - corridor_threshold) * (max_rotation - min_rotation) / (max_distance_change - corridor_threshold);
-            rotation_angle_deg = std::min(max_rotation, std::max(min_rotation, rotation_angle_deg));
-            float rotation_angle_rad = DEG2RAD(rotation_angle_deg);
+            rotation_angle_deg = std::min(max_rotation, std::max(min_rotation, rotation_angle_deg)); // Clamp the angle
+            float rotation_angle_rad = DEG2RAD(rotation_angle_deg); // Convert to radians
 
             ROS_WARN("Detected corridor on the LEFT! Turning %.1f°", rotation_angle_deg);
-            // vel.linear.x = 0.0;  use bumper data to continues check opening
-            // vel.angular.z = rotation_angle_rad; // 左转
+
+            // Orthogonalize the laser data
+            orthogonalizeRay(left_idx, nLasers, laser_data.left_distance, orthogonal_dist.left_distance, orthogonal_dist.front_distance);
+
+            // Initialize current position if this is the first corridor detection
+            if (corridor_count < 1) {
+                current_x = posX;
+                current_y = posY;
+                corridor_count += 1;
+            }
+
+            // Calculate the distance moved since the corridor was detected
+            delta_x = posX - current_x;
+            delta_y = posY - current_y;
+            float abs_move = (float)sqrt(pow(delta_x, 2) + pow(delta_y, 2));
+
+            // Move the robot until it reaches the desired distance
+            while (abs_move < orthogonal_dist.front_distance) {
+                vel.linear.x = min_speed; // Slow down
+                vel.angular.z = 0;       // Stop turning
+
+                // Update the current position and distance moved
+                delta_x = posX - current_x;
+                delta_y = posY - current_y;
+                abs_move = (float)sqrt(pow(delta_x, 2) + pow(delta_y, 2));
+
+                // Add a small delay or yield to avoid busy-waiting
+                ros::Duration(0.01).sleep(); // Adjust the duration as needed
+            }
         }
+
         else if (right_change > corridor_threshold) {
             // 计算旋转角度 (限制 30° ~ 90°)
             float rotation_angle_deg = min_rotation + (right_change - corridor_threshold) * (max_rotation - min_rotation) / (max_distance_change - corridor_threshold);
@@ -186,27 +274,17 @@ int main(int argc, char **argv) {
             float rotation_angle_rad = DEG2RAD(rotation_angle_deg);
 
             ROS_WARN("Detected corridor on the RIGHT! Turning %.1f°", rotation_angle_deg);
+            //  orthogonalizeRay(left_idx, nLasers, laser_data.right_distance, orthogonal_dist.right_distance, orthogonal_dist.front_distance);
             // vel.linear.x = 0.0;   use bumper data to continues check opening
             // vel.angular.z = -rotation_angle_rad; // 右转
         }
 
         else {
-            // **正常扶墙逻辑**
-            if (front_dist > 1.0) {
-                if (left_dist < target_distance) {
-                    vel.angular.z = -k * (1 - exp(-alpha * left_dist)); // 向右调整
-                } 
-                else if (left_dist > target_distance) {
-                    vel.angular.z = k * (1 - exp(-alpha * left_dist));  // 向左调整
-                } 
-                else {
-                    vel.angular.z = 0.0;  
-                }
-            } 
-            else {
-                vel.linear.x = min_speed; // 减速
-                vel.angular.z = -0.26;    // 右转避障
-            }
+            // Choose the wall to follow (LEFT or RIGHT)
+            WallSide wall_side = LEFT; // Change to RIGHT to follow the right wall
+
+            // Call the wall-following function
+            wallFollowing(wall_side, left_dist, right_dist, front_dist, target_distance, min_speed, k, alpha);
         }
 
         // **存储当前激光读数，供下一次循环比较**
