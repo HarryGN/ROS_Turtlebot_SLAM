@@ -105,6 +105,9 @@ int main(int argc, char **argv) {
     const float max_speed = 0.25;  // Max linear speed
     const float min_speed = 0.1;   // Min linear speed
 
+    // 全局变量：存储上一帧的左/右激光读数
+    float prev_left_distance = 0.0, prev_right_distance = 0.0;
+
     while (ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
 
@@ -112,39 +115,74 @@ int main(int argc, char **argv) {
         float left_dist = std::isnan(laser_data.left_distance) ? safe_threshold : laser_data.left_distance;
         float right_dist = std::isnan(laser_data.right_distance) ? safe_threshold : laser_data.right_distance;
 
-        // Find the closest obstacle
+        // Speed Zone check
         float closest_obstacle = std::min({front_dist, left_dist, right_dist});
 
-        // Dynamic speed control
+        // Dynamic vel control
         if (closest_obstacle >= safe_threshold) {
-            vel.linear.x = max_speed;  // If no nearby obstacles, move at max speed
+            vel.linear.x = max_speed;  // 没有障碍物时跑最快
         } else {
-            // Linearly interpolate speed between min_speed and max_speed based on obstacle proximity
             vel.linear.x = min_speed + (max_speed - min_speed) * ((closest_obstacle - target_distance) / (safe_threshold - target_distance));
-            vel.linear.x = std::max(static_cast<double>(min_speed),std::min(static_cast<double>(max_speed), vel.linear.x));
-
+            vel.linear.x = std::max(static_cast<double>(min_speed), std::min(static_cast<double>(max_speed), vel.linear.x));
         }
 
-        if (front_dist > 1.0) {
-            if (left_dist < target_distance) {
-                vel.angular.z = -k * (1 - exp(-alpha * left_dist)); // Exponential decay for left turns
-            } 
-            else if (left_dist > target_distance) {
-                vel.angular.z = k * (1 - exp(-alpha * left_dist));  // Exponential decay for right turns
+        // **检测通道**
+        float corridor_threshold = 0.6;   // 设定通道触发阈值
+        float max_distance_change = 1.5;  // 设定最大突变距离
+        float min_rotation = 30.0;        // 最小旋转角度
+        float max_rotation = 90.0;        // 最大旋转角度
+
+        float left_change = left_dist - prev_left_distance;
+        float right_change = right_dist - prev_right_distance;
+
+        if (left_change > corridor_threshold) {
+            // 计算旋转角度 (限制 30° ~ 90°)
+            float rotation_angle_deg = min_rotation + (left_change - corridor_threshold) * (max_rotation - min_rotation) / (max_distance_change - corridor_threshold);
+            rotation_angle_deg = std::min(max_rotation, std::max(min_rotation, rotation_angle_deg));
+            float rotation_angle_rad = DEG2RAD(rotation_angle_deg);
+
+            ROS_WARN("Detected corridor on the LEFT! Turning %.1f°", rotation_angle_deg);
+            // vel.linear.x = 0.0;  use bumper data to continues check opening
+            // vel.angular.z = rotation_angle_rad; // 左转
+        }
+        else if (right_change > corridor_threshold) {
+            // 计算旋转角度 (限制 30° ~ 90°)
+            float rotation_angle_deg = min_rotation + (right_change - corridor_threshold) * (max_rotation - min_rotation) / (max_distance_change - corridor_threshold);
+            rotation_angle_deg = std::min(max_rotation, std::max(min_rotation, rotation_angle_deg));
+            float rotation_angle_rad = DEG2RAD(rotation_angle_deg);
+
+            ROS_WARN("Detected corridor on the RIGHT! Turning %.1f°", rotation_angle_deg);
+            // vel.linear.x = 0.0;   use bumper data to continues check opening
+            // vel.angular.z = -rotation_angle_rad; // 右转
+        }
+
+        else {
+            // **正常扶墙逻辑**
+            if (front_dist > 1.0) {
+                if (left_dist < target_distance) {
+                    vel.angular.z = -k * (1 - exp(-alpha * left_dist)); // 向右调整
+                } 
+                else if (left_dist > target_distance) {
+                    vel.angular.z = k * (1 - exp(-alpha * left_dist));  // 向左调整
+                } 
+                else {
+                    vel.angular.z = 0.0;  
+                }
             } 
             else {
-                vel.angular.z = 0.0;  
+                vel.linear.x = min_speed; // 减速
+                vel.angular.z = -0.26;    // 右转避障
             }
-        } 
-        else {
-            vel.linear.x = min_speed; // Reduce speed when too close to an obstacle
-            vel.angular.z = -0.26;    // Rotate in place to adjust to the right
         }
 
-        // Publish velocity
+        // **存储当前激光读数，供下一次循环比较**
+        prev_left_distance = left_dist;
+        prev_right_distance = right_dist;
+
+        // 发布速度指令
         vel_pub.publish(vel);
 
-        // Update the timer
+        // 更新时间
         secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::system_clock::now() - start
         ).count();
