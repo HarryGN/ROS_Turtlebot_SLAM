@@ -137,27 +137,37 @@ double get_total_dist() {
     for (size_t i = 1; i < positions.size(); ++i) {
         total_dist += calculate_distance(positions[i - 1], positions[i]);  // Sum up distances between consecutive points
     }
-    ROS_INFO("Total distance = %f", total_dist);
+    
     return total_dist;
 }
 
 
 
 
-// Check if the same place is visited. Robot need to travel at least min_distance
+// Check if the [corner coordinate] is set
+// Check if the first cornor coordinate is visited. Robot need to travel at least min_distance
 // Need to tune the threshold -----------------------------------------------------------------------------------------------------
 // Modify !!!!!
 bool is_position_visited(double x, double y, double threshold = 1.0, double min_distance = 4) {
     double total_dist = get_total_dist();
+    ROS_INFO("Total distance = %f", total_dist);
+    bool corner_set = false;
 
-    // Only check for revisiting if the robot has moved at least 'min_distance'
+    // corner coordinates set when travel distance >= min_distance
     if (total_dist > min_distance) {
-        // Check if the current position is within the threshold of any stored position
-        for (const auto& coord : positions) {
-            if (std::abs(coord.first - x) < threshold && std::abs(coord.second - y) < threshold) {
-                return true; // Position has been visited
-            }
+        corner_set = true;
+        ROS_INFO("Corner_set Flag = TRUE"); 
+
+        // Read the corner coordinates
+        std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
+        // ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
+
+        // Check if the current position is within the threshold of the first corner coordinate
+        // for (const auto& coord : positions) {
+        if (std::abs(corners.first.first - x) < threshold && std::abs(corners.first.second - y) < threshold) {
+            return true; // Position has been visited
         }
+        //}
     }
 
     return false; // Position has not been visited
