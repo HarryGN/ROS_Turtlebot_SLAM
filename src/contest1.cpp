@@ -39,39 +39,68 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
    
 }
 
+#include <limits>
+#include <cmath>  // For std::isnan
+
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
     minLaserDist = std::numeric_limits<float>::infinity();
-    // maxLaserDist = std::numeric_limits<float>::infinity();
     nLasers = (msg->angle_max - msg->angle_min) / msg->angle_increment;
-    // desiredNLasers = desiredAngle*M_PI / (180*msg->angle_increment);
 
-    // Get the indices for first, middle, and last readings
-    int right_idx = 0;                 // First reading (left)
-    int front_idx = nLasers / 2;      // Middle reading (front)
-    int left_idx = nLasers - 1;      // Last reading (right)
-    
-    right_distance = msg->ranges[right_idx];
-    front_distance = msg->ranges[front_idx];
-    left_distance = msg->ranges[left_idx];
+    // Get the indices for left, front, and right readings
+    int right_idx = 0;                 
+    int front_idx = nLasers / 2;       
+    int left_idx = nLasers - 1;        
+
+    // Helper function to calculate the average of three consecutive readings while handling NaNs
+    auto avg_range = [&](int idx) -> float {
+        float sum = 0.0;
+        int count = 0;
+
+        // Consider three values: previous, current, next
+        if (idx > 0 && !std::isnan(msg->ranges[idx - 1])) {
+            sum += msg->ranges[idx - 1];
+            count++;
+        }
+        if (!std::isnan(msg->ranges[idx])) {
+            sum += msg->ranges[idx];
+            count++;
+        }
+        if (idx < nLasers - 1 && !std::isnan(msg->ranges[idx + 1])) {
+            sum += msg->ranges[idx + 1];
+            count++;
+        }
+
+        // If all values were NaN, return NaN
+        return (count > 0) ? (sum / count) : std::numeric_limits<float>::quiet_NaN();
+    };
+
+    // Compute averaged distances with NaN handling
+    right_distance = avg_range(right_idx);
+    front_distance = avg_range(front_idx);
+    left_distance = avg_range(left_idx);
 
     // Log the results
-    ROS_INFO("Left (first) distance: %.2f m", left_distance);
-    ROS_INFO("Front (middle) distance: %.2f m", front_distance);
-    ROS_INFO("Right (last) distance: %.2f m", right_distance);
-    
+    ROS_INFO("Left (avg of 3) distance: %.2f m", left_distance);
+    ROS_INFO("Front (avg of 3) distance: %.2f m", front_distance);
+    ROS_INFO("Right (avg of 3) distance: %.2f m", right_distance);
+
+    // Min laser distance calculation
     if (desiredAngle * M_PI / 180 < msg->angle_max && -desiredAngle * M_PI / 180 > msg->angle_min) {
-        for (uint32_t laser_idx = nLasers / 2 - desiredNLasers; laser_idx < nLasers / 2 + desiredNLasers; ++laser_idx){
-            minLaserDist = std::min(minLaserDist, msg->ranges[laser_idx]);
+        for (uint32_t laser_idx = nLasers / 2 - desiredNLasers; laser_idx < nLasers / 2 + desiredNLasers; ++laser_idx) {
+            if (!std::isnan(msg->ranges[laser_idx])) {
+                minLaserDist = std::min(minLaserDist, msg->ranges[laser_idx]);
+            }
         }
-    }
-    else {
+    } else {
         for (uint32_t laser_idx = 0; laser_idx < nLasers; ++laser_idx) {
-             std::min(minLaserDist, msg->ranges[laser_idx]);
+            if (!std::isnan(msg->ranges[laser_idx])) {
+                minLaserDist = std::min(minLaserDist, msg->ranges[laser_idx]);
+            }
         }
     }
 
-    ROS_INFO("Min distance: %i", minLaserDist);
+    ROS_INFO("Min distance: %.2f m", minLaserDist);
 }
 
 int main(int argc, char **argv)
