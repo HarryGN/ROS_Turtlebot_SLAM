@@ -310,7 +310,7 @@ int main(int argc, char **argv)
         #pragma endregion
 
         else if(front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)){
-            ROS_INFO("Right Wall Following");
+            ROS_INFO("Left Wall Following");
             if (left_distance < target_distance || left_distance > target_distance) {
                 ros::spinOnce();
 
