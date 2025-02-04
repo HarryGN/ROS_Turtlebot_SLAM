@@ -11,6 +11,8 @@
 #include <cmath>
 
 #include <chrono>
+#include <algorithm>
+#include <numeric>
 
 #define N_BUMPER (3)
 #define RAD2DEG(rad) ((rad) * 180. / M_PI)
@@ -141,13 +143,9 @@ double get_total_dist() {
     return total_dist;
 }
 
-
-
-
 // Check if the [corner coordinate] is set
 // Check if the first cornor coordinate is visited. Robot need to travel at least min_distance
 // Need to tune the threshold -----------------------------------------------------------------------------------------------------
-// Modify !!!!!
 bool is_position_visited(double x, double y, double threshold = 1.0, double min_distance = 4) {
     double total_dist = get_total_dist();
     ROS_INFO("Total distance = %f", total_dist);
@@ -160,21 +158,61 @@ bool is_position_visited(double x, double y, double threshold = 1.0, double min_
 
         // Read the corner coordinates
         std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
-        // ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
 
         // Check if the current position is within the threshold of the first corner coordinate
-        // for (const auto& coord : positions) {
         if (std::abs(corners.first.first - x) < threshold && std::abs(corners.first.second - y) < threshold) {
             return true; // Position has been visited
         }
-        //}
     }
-
     return false; // Position has not been visited
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 
+// Function to calculate the perpendicular distance from a point to a line defined by two points (corner1 and corner2)
+double point_to_line_distance(const std::pair<double, double>& point, const std::pair<double, double>& line_start, const std::pair<double, double>& line_end) {
+    double normal_length = std::hypot(line_end.first - line_start.first, line_end.second - line_start.second);
+    return std::abs((point.first - line_start.first) * (line_end.second - line_start.second) - (point.second - line_start.second) * (line_end.first - line_start.first)) / normal_length;
+}
+
+// Function to determine the side of the line a point is on
+int line_side(const std::pair<double, double>& point, const std::pair<double, double>& line_start, const std::pair<double, double>& line_end) {
+    double result = (point.first - line_start.first) * (line_end.second - line_start.second) - (point.second - line_start.second) * (line_end.first - line_start.first);
+    return (result > 0) ? 1 : (result < 0) ? -1 : 0;
+}
+
+// Improved function to find additional diagonal corners based on maximum perpendicular distance
+std::vector<std::pair<double, double>> get_all_corners() {
+    std::vector<std::pair<double, double>> all_corners;
+    std::pair<std::pair<double, double>, std::pair<double, double>> far_corners = filter_corner();
+
+    all_corners.push_back(far_corners.first);
+    all_corners.push_back(far_corners.second);
+
+    // Define variables for additional corners with max distances
+    double max_distance_1 = 0.0, max_distance_2 = 0.0;
+    std::pair<double, double> corner_3, corner_4;
+    int side_first = line_side(positions.front(), far_corners.first, far_corners.second);
+
+    for (const auto& coord : positions) {
+        double dist = point_to_line_distance(coord, far_corners.first, far_corners.second);
+        int side = line_side(coord, far_corners.first, far_corners.second);
+
+        // Ensure we're selecting points from opposite sides
+        if (side != side_first && dist > max_distance_1) {
+            max_distance_1 = dist;
+            corner_3 = coord;
+        } else if (side == side_first && dist > max_distance_2) {
+            max_distance_2 = dist;
+            corner_4 = coord;
+        }
+    }
+
+    all_corners.push_back(corner_3);
+    all_corners.push_back(corner_4);
+
+    return all_corners;
+}
 
 
 int main(int argc, char **argv)
@@ -248,6 +286,16 @@ int main(int argc, char **argv)
         // Then start zig-zag. Need to incorporate
         if (is_position_visited(posX, posY)) {
             ROS_INFO("Robot has completed a round and returned to previous position.");
+            
+            //get_all_corners
+            std::vector<std::pair<double, double>> corners = get_all_corners();
+            
+            // Printing out the corners for debugging or monitoring
+            ROS_INFO("Detected Corners:");
+            for (const auto& corner : corners) {
+                ROS_INFO("Corner: (X: %.2f, Y: %.2f)", corner.first, corner.second);
+            }
+
 	        break;  // Stop the loop if visited position
         }
     }
