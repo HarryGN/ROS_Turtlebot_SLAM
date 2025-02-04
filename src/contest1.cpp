@@ -78,20 +78,6 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     //ROS_INFO("Min distance: %i", minLaserDist);
 }
 
-// Store coordinates every second and print the list
-// void store_coordinates(const ros::TimerEvent&)
-// {
-//     // Store the current coordinates
-//     positions.push_back(std::make_pair(posX, posY));
-//     ROS_INFO("Stored coordinates: (%f, %f)", posX, posY);
-
-//     // Display the full list of stored coordinates
-//     ROS_INFO("Current list of stored coordinates:");
-//     for (const auto& coord : positions) {
-//         ROS_INFO("X: %.2f, Y: %.2f", coord.first, coord.second);
-//     }
-// }
-
 // Store the current coordinates in the position vector
 void get_coord() {
     bool is_visited = false;
@@ -144,15 +130,41 @@ std::pair<std::pair<double, double>, std::pair<double, double>> filter_corner() 
 }
 
 
-// Check if the same place is visited
-bool is_position_visited(double x, double y, double threshold = 0.05) {
-    for (const auto& coord : positions) {
-        if (std::abs(coord.first - x) < threshold && std::abs(coord.second - y) < threshold) {
-            return true; // Position has been visited
+// Function to calculate total distance traveled
+double get_total_dist() {
+    double total_dist = 0.0;
+
+    for (size_t i = 1; i < positions.size(); ++i) {
+        total_dist += calculate_distance(positions[i - 1], positions[i]);  // Sum up distances between consecutive points
+    }
+    ROS_INFO("Total distance = %f", total_dist);
+    return total_dist;
+}
+
+
+
+
+// Check if the same place is visited. Robot need to travel at least min_distance
+// Need to tune the threshold -----------------------------------------------------------------------------------------------------
+// Modify !!!!!
+bool is_position_visited(double x, double y, double threshold = 1.0, double min_distance = 4) {
+    double total_dist = get_total_dist();
+
+    // Only check for revisiting if the robot has moved at least 'min_distance'
+    if (total_dist > min_distance) {
+        // Check if the current position is within the threshold of any stored position
+        for (const auto& coord : positions) {
+            if (std::abs(coord.first - x) < threshold && std::abs(coord.second - y) < threshold) {
+                return true; // Position has been visited
+            }
         }
     }
+
     return false; // Position has not been visited
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+
 
 
 int main(int argc, char **argv)
@@ -224,10 +236,10 @@ int main(int argc, char **argv)
 
         // Check if the robot has returned to a previous position
         // Then start zig-zag. Need to incorporate
-        // if (is_position_visited(posX, posY)) {
-        //     ROS_INFO("Robot has returned to a previously visited position.");
-	    //     break;  // Stop the loop if visited position
-        // }
+        if (is_position_visited(posX, posY)) {
+            ROS_INFO("Robot has completed a round and returned to previous position.");
+	        break;  // Stop the loop if visited position
+        }
     }
 
     return 0;
