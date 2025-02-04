@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <cmath>
+#include <limits>
 
 #include <chrono>
 
@@ -39,8 +40,6 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
    
 }
 
-#include <limits>
-#include <cmath>  // For std::isnan
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
