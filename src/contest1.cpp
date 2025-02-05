@@ -202,6 +202,7 @@ int main(int argc, char **argv) {
 
     // 全局变量：存储上一帧的左/右激光读数
     float prev_left_distance = 0.0, prev_right_distance = 0.0;
+    float prev_left_idx = 0.0, prev_right_idx = 0.0;
 
     while (ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
@@ -244,7 +245,7 @@ int main(int argc, char **argv) {
             
             vel.angular.z = 0.0;  // No adjustment needed
             // Orthogonalize the laser data
-            orthogonalizeRay(left_idx, nLasers, laser_data.left_distance, orthogonal_dist.left_distance, orthogonal_dist.front_distance);
+            orthogonalizeRay(prev_left_idx, nLasers, prev_left_distance, orthogonal_dist.left_distance, orthogonal_dist.front_distance);
 
             // Initialize current position if this is the first corridor detection
             if (corridor_count < 1) {
@@ -275,6 +276,7 @@ int main(int argc, char **argv) {
                 ROS_WARN("front distance move %.1f°", orthogonal_dist.front_distance);
             }
             wall_following = false;
+            abs_move = 0;
         }
 
         else if (right_change > corridor_threshold & wall_following) {
@@ -301,6 +303,8 @@ int main(int argc, char **argv) {
         // **存储当前激光读数，供下一次循环比较**
         prev_left_distance = left_dist;
         prev_right_distance = right_dist;
+        prev_left_idx = left_idx;
+        prev_right_idx = right_idx;
 
         // 发布速度指令
         vel_pub.publish(vel);
