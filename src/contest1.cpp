@@ -151,7 +151,8 @@ void wallFollowing(WallSide wall_side, float left_dist, float right_dist, float 
             if (left_dist < target_distance) {
                 vel.angular.z = -k * (1 - exp(-alpha * left_dist)); // Adjust right
             } else if (left_dist > target_distance) {
-                vel.angular.z = k * (1 - exp(-alpha * left_dist));  // Adjust left
+                
+                vel.angular.z = DEG2RAD(28);  // Adjust left
             } else {
                 vel.angular.z = 0.0;  // No adjustment needed
             }
