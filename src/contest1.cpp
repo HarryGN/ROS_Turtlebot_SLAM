@@ -58,6 +58,7 @@ void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, fl
     float angle = (float) ind / (float) nLasers * full_angle + 90 - full_angle / 2;
     horz_dist = distance * std::cos(DEG2RAD(angle));
     front_dist = distance * std::sin(DEG2RAD(angle));
+    front_dist += 0.05;
 }
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
@@ -186,7 +187,7 @@ void rotateRobot(double angular_speed, double duration) {
 
 
 // Function to perform wall-following logic
-void wallFollowing(WallSide wall_side, bool curr_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel) {
+void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel) {
     // **Wall-Following Logic**
     if (front_dist > 0.9) {
         if (wall_side == LEFT) {
@@ -209,20 +210,24 @@ void wallFollowing(WallSide wall_side, bool curr_turn, float left_dist, float ri
             }
         }
     } 
-    else if (front_dist < 0.9 & left_dist < 0.9 & right_dist < 0.9) {
+    else if (front_dist < 0.9 & left_dist < 0.9 & right_dist < 0.9 & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
-        rotateRobot(-0.25, 25.12);
+        ROS_INFO("surrounded by three walls");
+        rotateRobot(-0.25, 12.56);
         rotateRobot(0, 0);
         curr_turn = true;
+        
     }
     else if (front_dist < 0.9 & left_dist < 0.9 & right_dist > 0.9) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
+        ROS_INFO("Turn to the right");
         rotateRobot(-0.25, 6.28);
         rotateRobot(0, 0);
         curr_turn = true;
     }
     else if (front_dist < 0.9 & left_dist > 0.9 & right_dist < 0.9) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
+        ROS_INFO("Turn to the left");
         rotateRobot(0.25, 6.28);
         rotateRobot(0, 0);
         curr_turn = true;
@@ -342,7 +347,7 @@ int main(int argc, char **argv) {
             // ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
 
             // Call the wall-following function
-            wallFollowing(wall_side, curr_turn, left_dist, right_dist, front_dist, target_distance, min_speed, k, alpha, vel);
+            wallFollowing(wall_side, curr_turn, prev_turn, right_dist, front_dist, target_distance, min_speed, k, alpha, vel);
         }
 
         // **存储当前激光读数，供下一次循环比较**
