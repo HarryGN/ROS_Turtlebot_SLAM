@@ -45,40 +45,70 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
     ROS_INFO("(x,y):(%f,%f).", posX, posY);
 }
 
-void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
-{
-    minLaserDist = std::numeric_limits<float>::infinity();
-    // maxLaserDist = std::numeric_limits<float>::infinity();
-    nLasers = (msg->angle_max - msg->angle_min) / msg->angle_increment;
-    // desiredNLasers = desiredAngle*M_PI / (180*msg->angle_increment);
+// void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
+// {
+//     minLaserDist = std::numeric_limits<float>::infinity();
+//     // maxLaserDist = std::numeric_limits<float>::infinity();
+//     nLasers = (msg->angle_max - msg->angle_min) / msg->angle_increment;
+//     ROS_INFO("Number of Lasers: %f", nLasers);
+//     // desiredNLasers = desiredAngle*M_PI / (180*msg->angle_increment);
 
-    // Get the indices for first, middle, and last readings
-    int right_idx = 0;                 // First reading (left)
-    int front_idx = nLasers / 2;      // Middle reading (front)
-    int left_idx = nLasers - 1;      // Last reading (right)
+//     // Get the indices for first, middle, and last readings
+//     int right_idx = 0;                 // First reading (left)
     
-    right_distance = msg->ranges[right_idx];
-    front_distance = msg->ranges[front_idx];
-    left_distance = msg->ranges[left_idx];
+//     int front_idx = nLasers / 2;      // Middle reading (front)
 
-    // Log the results
-    //ROS_INFO("Left (first) distance: %.2f m", left_distance);
-    //ROS_INFO("Front (middle) distance: %.2f m", front_distance);
-    //ROS_INFO("Right (last) distance: %.2f m", right_distance);
+//     int left_idx = nLasers - 1;      // Last reading (right)
     
-    if (desiredAngle * M_PI / 180 < msg->angle_max && -desiredAngle * M_PI / 180 > msg->angle_min) {
-        for (uint32_t laser_idx = nLasers / 2 - desiredNLasers; laser_idx < nLasers / 2 + desiredNLasers; ++laser_idx){
-            minLaserDist = std::min(minLaserDist, msg->ranges[laser_idx]);
-        }
-    }
-    else {
-        for (uint32_t laser_idx = 0; laser_idx < nLasers; ++laser_idx) {
-             std::min(minLaserDist, msg->ranges[laser_idx]);
-        }
-    }
+//     right_distance = msg->ranges[right_idx];
+//     front_distance = msg->ranges[front_idx];
+//     left_distance = msg->ranges[left_idx];
+    
+//     if (desiredAngle * M_PI / 180 < msg->angle_max && -desiredAngle * M_PI / 180 > msg->angle_min) {
+//         for (uint32_t laser_idx = nLasers / 2 - desiredNLasers; laser_idx < nLasers / 2 + desiredNLasers; ++laser_idx){
+//             minLaserDist = std::min(minLaserDist, msg->ranges[laser_idx]);
+//         }
+//     }
+//     else {
+//         for (uint32_t laser_idx = 0; laser_idx < nLasers; ++laser_idx) {
+//              std::min(minLaserDist, msg->ranges[laser_idx]);
+//         }
+//     }
 
-    //ROS_INFO("Min distance: %i", minLaserDist);
+//     //ROS_INFO("Min distance: %i", minLaserDist);
+// }
+
+
+void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
+    int   = (msg->angle_max - msg->angle_min) / msg->angle_increment;
+    // ROS_INFO("Number of Lasers: %d", nLasers);
+
+    std::vector<std::pair<float, float>> distance_angle_pairs;
+
+    for (int i = 0; i < nLasers; ++i) {
+        float angle = msg->angle_min + i * msg->angle_increment;
+        float distance = msg->ranges[i];
+        float angle_deg = RAD2DEG(angle);
+
+        // Store each distance and its corresponding angle
+        distance_angle_pairs.push_back(std::make_pair(distance, angle_deg));
+
+        // Optionally log each distance and angle
+        ROS_INFO("Angle: %.2f degrees, Distance: %.2f meters", angle_deg, distance);
+    }
 }
+
+
+
+// void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist){
+//     float angle = (float) ind / (float) nLasers * fullAngle + 90 - fullAngle/2;
+//     horz_dist = distance * std::cos(Deg2Rad(angle));
+//     front_dist = distance * std::sin(Deg2Rad(angle));
+// }
+
+// void laser_to_coord(){double x, double y
+
+// }
 
 // Store the current coordinates in the position vector
 void get_coord() {
