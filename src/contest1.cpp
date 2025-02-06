@@ -14,9 +14,19 @@
 #include <algorithm>
 #include <numeric>
 
+// laserscan to coordinates
+#include <vector>
+#include <limits>
+
 #define N_BUMPER (3)
 #define RAD2DEG(rad) ((rad) * 180. / M_PI)
 #define DEG2RAD(deg) ((deg) * M_PI / 180.)
+
+// struct for coordinates store
+struct Point {
+    float x;
+    float y;
+};
 
 double posX = 0., posY = 0., yaw = 0.;
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
@@ -45,40 +55,8 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
     ROS_INFO("(x,y):(%f,%f).", posX, posY);
 }
 
-// void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
-// {
-//     minLaserDist = std::numeric_limits<float>::infinity();
-//     // maxLaserDist = std::numeric_limits<float>::infinity();
-//     nLasers = (msg->angle_max - msg->angle_min) / msg->angle_increment;
-//     ROS_INFO("Number of Lasers: %f", nLasers);
-//     // desiredNLasers = desiredAngle*M_PI / (180*msg->angle_increment);
-
-//     // Get the indices for first, middle, and last readings
-//     int right_idx = 0;                 // First reading (left)
-    
-//     int front_idx = nLasers / 2;      // Middle reading (front)
-
-//     int left_idx = nLasers - 1;      // Last reading (right)
-    
-//     right_distance = msg->ranges[right_idx];
-//     front_distance = msg->ranges[front_idx];
-//     left_distance = msg->ranges[left_idx];
-    
-//     if (desiredAngle * M_PI / 180 < msg->angle_max && -desiredAngle * M_PI / 180 > msg->angle_min) {
-//         for (uint32_t laser_idx = nLasers / 2 - desiredNLasers; laser_idx < nLasers / 2 + desiredNLasers; ++laser_idx){
-//             minLaserDist = std::min(minLaserDist, msg->ranges[laser_idx]);
-//         }
-//     }
-//     else {
-//         for (uint32_t laser_idx = 0; laser_idx < nLasers; ++laser_idx) {
-//              std::min(minLaserDist, msg->ranges[laser_idx]);
-//         }
-//     }
-
-//     //ROS_INFO("Min distance: %i", minLaserDist);
-// }
-
-
+/*
+// Get all the scanned data (number of laser = 639)
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     int   = (msg->angle_max - msg->angle_min) / msg->angle_increment;
     // ROS_INFO("Number of Lasers: %d", nLasers);
@@ -93,21 +71,43 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
         // Store each distance and its corresponding angle
         distance_angle_pairs.push_back(std::make_pair(distance, angle_deg));
 
-        // Optionally log each distance and angle
         ROS_INFO("Angle: %.2f degrees, Distance: %.2f meters", angle_deg, distance);
     }
 }
+*/
 
+
+void computeAdvanceCoordinate(float distance, float angle_rad, float posX, float posY, float &targetX, float &targetY){
+    float dx = distance * std::cos(angle_rad);
+    float dy = distance * std::sin(angle_rad);
+
+    targetX = posX + dx;
+    targetY = posY + dy;
+}
+
+void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
+    int nLasers = (msg->angle_max - msg->angle_min) / msg->angle_increment;
+    std::vector<Point> scanPoints;
+
+    for (int i = 0; i < nLasers; ++i) {
+        float angle = msg->angle_min + i * msg->angle_increment;
+        float distance = msg->ranges[i];
+
+        if (!std::isnan(distance)) {  // Check if distance is nan
+            float targetX, targetY;
+            // Calculate global position of the scan point
+            computeAdvanceCoordinate(distance, angle + yaw, posX, posY, targetX, targetY);
+            scanPoints.push_back({targetX, targetY});
+            ROS_INFO("X: %.2f, Y: %.2f", targetX, targetY);
+        }
+    }
+}
 
 
 // void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist){
 //     float angle = (float) ind / (float) nLasers * fullAngle + 90 - fullAngle/2;
 //     horz_dist = distance * std::cos(Deg2Rad(angle));
 //     front_dist = distance * std::sin(Deg2Rad(angle));
-// }
-
-// void laser_to_coord(){double x, double y
-
 // }
 
 // Store the current coordinates in the position vector
@@ -283,6 +283,7 @@ int main(int argc, char **argv)
 
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
+        /*
         if (front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)) {
     
             const double k = 0.15;   // Scaling factor for angular velocity
@@ -305,6 +306,7 @@ int main(int argc, char **argv)
             linear = 0.04;
             angular = -0.26;                     // Rotate in place to adjust to right
         }
+        */
         vel.angular.z = angular;
         vel.linear.x = linear;
         vel_pub.publish(vel);
