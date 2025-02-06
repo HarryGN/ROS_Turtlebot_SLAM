@@ -17,6 +17,7 @@
 // laserscan to coordinates
 #include <vector>
 #include <limits>
+#include <queue>
 
 #define N_BUMPER (3)
 #define RAD2DEG(rad) ((rad) * 180. / M_PI)
@@ -27,6 +28,33 @@ struct Point {
     float x;
     float y;
 };
+
+// Define the occupancy grid and its properties
+struct OccupancyGrid {
+    int width, height;
+    float resolution;
+    std::vector<int> state; // -1 = unknown, 0 = free, 1 = occupied
+
+    OccupancyGrid(int w, int h, float res) : width(w), height(h), resolution(res), state(w * h, -1) {}
+
+    // Method to update cell based on world coordinates
+    void updateCell(float worldX, float worldY, int value) {
+        int gridX = static_cast<int>(floor(worldX / resolution) + width / 2);
+        int gridY = static_cast<int>(floor(worldY / resolution) + height / 2);
+        if (gridX >= 0 && gridX < width && gridY >= 0 && gridY < height) {
+            state[gridY * width + gridX] = value;
+        }
+    }
+
+    // Method to get the value at a specific cell
+    int getCell(int gridX, int gridY) const {
+        if (gridX >= 0 && gridX < width && gridY >= 0 && gridY < height) {
+            return state[gridY * width + gridX];
+        }
+        return -1; // Return -1 for out of bounds
+    }
+};
+
 
 double posX = 0., posY = 0., yaw = 0.;
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
@@ -98,17 +126,10 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
             // Calculate global position of the scan point
             computeAdvanceCoordinate(distance, angle + yaw, posX, posY, targetX, targetY);
             scanPoints.push_back({targetX, targetY});
-            ROS_INFO("X: %.2f, Y: %.2f", targetX, targetY);
+            ROS_INFO(" Global X: %.2f, Y: %.2f", targetX, targetY);
         }
     }
 }
-
-
-// void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist){
-//     float angle = (float) ind / (float) nLasers * fullAngle + 90 - fullAngle/2;
-//     horz_dist = distance * std::cos(Deg2Rad(angle));
-//     front_dist = distance * std::sin(Deg2Rad(angle));
-// }
 
 // Store the current coordinates in the position vector
 void get_coord() {
@@ -124,22 +145,22 @@ void get_coord() {
         positions.push_back(std::make_pair(posX, posY)); // Only store new coordinates
         ROS_INFO("Stored coordinates: (%f, %f)", posX, posY);
     } else {
-        ROS_INFO("Coordinates (%f, %f) already visited, not storing again.", posX, posY);
+        // ROS_INFO("Coordinates (%f, %f) already visited, not storing again.", posX, posY);
     }
 
     // Display the full list of stored coordinates
-    ROS_INFO("Current list of stored coordinates:");
+    /*ROS_INFO("Current list of stored coordinates:");
     for (const auto& coord : positions) {
         ROS_INFO("X: %.2f, Y: %.2f", coord.first, coord.second);
     }
+    */
 }
 
-// Calculate Euclidean distance between two points
 double calculate_distance(const std::pair<double, double>& p1, const std::pair<double, double>& p2) {
     return std::sqrt(std::pow(p2.first - p1.first, 2) + std::pow(p2.second - p1.second, 2));
 }
 
-// Function to find the corner coordinates with the largest distance between them
+// find the corner coordinates with the largest distance between them
 std::pair<std::pair<double, double>, std::pair<double, double>> filter_corner() {
     double max_distance = 0.0;
     std::pair<double, double> corner1, corner2;
@@ -161,8 +182,6 @@ std::pair<std::pair<double, double>, std::pair<double, double>> filter_corner() 
     return std::make_pair(corner1, corner2);
 }
 
-
-// Function to calculate total distance traveled
 double get_total_dist() {
     double total_dist = 0.0;
 
@@ -199,19 +218,18 @@ bool is_position_visited(double x, double y, double threshold = 1.0, double min_
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 
-// Function to calculate the perpendicular distance from a point to a line defined by two points (corner1 and corner2)
+// calculate the perpendicular distance from a point to a line defined by two points (corner1 and corner2)
 double point_to_line_distance(const std::pair<double, double>& point, const std::pair<double, double>& line_start, const std::pair<double, double>& line_end) {
     double normal_length = std::hypot(line_end.first - line_start.first, line_end.second - line_start.second);
     return std::abs((point.first - line_start.first) * (line_end.second - line_start.second) - (point.second - line_start.second) * (line_end.first - line_start.first)) / normal_length;
 }
 
-// Function to determine the side of the line a point is on
 int line_side(const std::pair<double, double>& point, const std::pair<double, double>& line_start, const std::pair<double, double>& line_end) {
     double result = (point.first - line_start.first) * (line_end.second - line_start.second) - (point.second - line_start.second) * (line_end.first - line_start.first);
     return (result > 0) ? 1 : (result < 0) ? -1 : 0;
 }
 
-// Improved function to find additional diagonal corners based on maximum perpendicular distance
+// find additional diagonal corners based on maximum perpendicular distance
 std::vector<std::pair<double, double>> get_all_corners() {
     std::vector<std::pair<double, double>> all_corners;
     std::pair<std::pair<double, double>, std::pair<double, double>> far_corners = filter_corner();
