@@ -321,20 +321,9 @@ int main(int argc, char **argv) {
                 corridor_count += 1;
             }
 
-            // Calculate the distance moved since the corridor was detected
-            // delta_x = posX - current_x;
-            // delta_y = posY - current_y;
-            // float abs_move = (float)sqrt(pow(delta_x, 2) + pow(delta_y, 2));
-
-            // Move the robot until it reaches the desired distance
-            
-            moveRobot(orthogonal_dist.front_distance, 0)
-            // ROS_INFO("Wait loop");
-            // ROS_WARN("abs move %.1f°", abs_move);
+            moveRobot(orthogonal_dist.front_distance, 0);
             ROS_WARN("front distance move %.1f°", orthogonal_dist.front_distance);
-            
             wall_following = false;
-            abs_move = 0;
         }
 
         else if (right_change > corridor_threshold & wall_following) {
