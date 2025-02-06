@@ -347,7 +347,7 @@ int main(int argc, char **argv) {
             // ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
 
             // Call the wall-following function
-            wallFollowing(wall_side, curr_turn, prev_turn, right_dist, front_dist, target_distance, min_speed, k, alpha, vel);
+            wallFollowing(wall_side, curr_turn, prev_turn, left_dist, front_dist, target_distance, min_speed, k, alpha, vel);
         }
 
         // **存储当前激光读数，供下一次循环比较**
