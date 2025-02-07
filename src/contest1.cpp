@@ -67,6 +67,7 @@ float minLinear = 0.1;
 float maxLinear = 0.45;
 bool prev_turn = false;
 bool curr_turn = false;
+bool bumper_event_in_progress = false;
 LaserScanData laser_data;
 OrthogonalDist orthogonal_dist;
 float full_angle = 57;
@@ -312,6 +313,8 @@ void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publis
 }
 
 void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+    if(bumper_event_in_progress) return;
+    bumper_event_in_progress = true;
     ROS_INFO("handleBumperPressed() called...");
     float reverseDistance = 0.2;
     float forwardDistance = reverseDistance / std::cos(Deg2Rad(turnAngle)) * 0.9;
@@ -329,14 +332,20 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
 
     while((d-reverseDistance) < exitDistanceThreshold){
         ros::spinOnce();
-        ROS_INFO("%.2f", d-reverseDistance);
-        ROS_INFO("%.2f", exitDistanceThreshold);
-
+        if(bumpers.anyPressed){ // Emergency stop if hit again
+            ROS_WARN("Emergency stop: bumper re-hit during reverse.");
+            linear = 0;
+            angular = 0;
+            vel.angular.z = angular;
+            vel.linear.x = linear;
+            vel_pub.publish(vel);
+            bumper_event_in_progress = false;
+            return;
+        }
         linear = -0.1;
         angular = 0;
-
-        dx = posX-x0;
-        dy = posY-y0;
+        dx = posX - x0;
+        dy = posY - y0;
         d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
 
 
@@ -346,9 +355,9 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
         vel_pub.publish(vel);
     }
 
-
+    
     // 2. Turn
-    if(turnAngle == 0){ // If center bumper was pressed this is called
+    if(turnAngle == 0){
         if(laser_data.left_distance > laser_data.right_distance){
             turnAngle = 45;
         }
@@ -368,15 +377,23 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
     dx = 0;
     dy = 0;
     d = 0;
-    ROS_INFO("%.2f", d-forwardDistance);
+    
     while((d-forwardDistance) < exitDistanceThreshold){
         ros::spinOnce();
-
+        if(bumpers.anyPressed){ // Emergency stop if hit again
+            ROS_WARN("Emergency stop: bumper re-hit during advance.");
+            linear = 0;
+            angular = 0;
+            vel.angular.z = angular;
+            vel.linear.x = linear;
+            vel_pub.publish(vel);
+            bumper_event_in_progress = false;
+            return;
+        }
         linear = 0.1;
         angular = 0;
-
-        dx = posX-x0;
-        dy = posY-y0;
+        dx = posX - x0;
+        dy = posY - y0;
         d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
 
 
@@ -389,19 +406,18 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
     // 4. Turn Back
     ROS_INFO("handleBumperPressed() | Correcting yaw...");
     rotateToHeading(yaw - turnAngle * 0.7, vel, vel_pub);
-
-
-
     ROS_INFO("handleBumperPressed() | END");
     linear = 0;
+    angular = 0;    
+    angular = 0;    
+    
     angular = 0;
-
+    
     vel.angular.z = angular;
     vel.linear.x = linear;
     vel_pub.publish(vel);
-
+    bumper_event_in_progress = false;
     return;
-
 }
 
 void bumper_handling (geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
