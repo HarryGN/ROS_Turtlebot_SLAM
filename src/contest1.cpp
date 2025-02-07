@@ -77,7 +77,11 @@ int front_idx = 0;     // 前方激光索引
 int left_idx = 0;      // 左侧激光索引
 // Create a vector to store positions
 std::vector<std::pair<double, double>> positions;
+
+// Global Publishers
 ros::Publisher vel_pub;
+ros::Publisher pose_pub;       // Added publisher for pose messages
+ros::Publisher marker_pub;     // Added publisher for marker messages
 #pragma endregion
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
@@ -688,6 +692,8 @@ int main(int argc, char **argv) {
     ros::Subscriber odom_sub = nh.subscribe("odom", 1, &odomCallback);
 
     vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
+    pose_pub = nh.advertise<geometry_msgs::PoseStamped>("robot_pose", 1);      // Initialize pose publisher
+    marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 1);  // Initialize marker publisher
     ros::Rate loop_rate(10);
 
     geometry_msgs::Twist vel;
