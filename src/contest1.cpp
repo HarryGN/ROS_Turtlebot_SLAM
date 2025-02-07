@@ -347,7 +347,7 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
 
     // 4. Turn Back
     ROS_INFO("handleBumperPressed() | Correcting yaw...");
-    rotateToHeading(yaw - turnAngle * 0.5, vel, vel_pub);
+    rotateToHeading(yaw - turnAngle * 0.7, vel, vel_pub);
 
 
 
