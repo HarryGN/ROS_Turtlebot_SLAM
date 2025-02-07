@@ -16,6 +16,9 @@
 #include <math.h>
 #include <string>
 
+#include <vector>
+#include <array>
+
 #define N_BUMPER (3)
 #define Rad2Deg(rad) ((rad) * 180. / M_PI)
 #define Deg2Rad(deg) ((deg) * M_PI / 180.)
@@ -40,9 +43,16 @@ float maxLinear = 0.45;
 
 #pragma region Bumper
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
-bool leftBumperPressed;
-bool centerBumperPressed;
-bool rightBumperPressed;
+
+struct BumpersStruct{
+    bool leftPressed;
+    bool centerPressed;
+    bool rightPressed;
+    bool anyPressed;
+};
+
+BumpersStruct bumpers;
+
 #pragma endregion
 
 #pragma region Laser
@@ -75,9 +85,8 @@ float fullAngle = 57.0;
 
 #pragma endregion
 
-#pragma region Laser Obstacle Avoidance
-
-
+#pragma region ZigZag
+std::vector<std::array<float,2>> zigZagPoints;
 #pragma endregion
 
 
@@ -89,10 +98,13 @@ void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, fl
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     bumper[msg->bumper] = msg->state;
-    leftBumperPressed = bumper[kobuki_msgs::BumperEvent::LEFT];
-    centerBumperPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
-    rightBumperPressed = bumper[kobuki_msgs::BumperEvent::RIGHT];
-    ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", leftBumperPressed, centerBumperPressed, rightBumperPressed);
+    bumpers.leftPressed = bumper[kobuki_msgs::BumperEvent::LEFT];
+    bumpers.centerPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
+    bumpers.rightPressed = bumper[kobuki_msgs::BumperEvent::RIGHT];
+
+    bumpers.anyPressed = bumpers.leftPressed || bumpers.centerPressed || bumpers.rightPressed;
+
+    ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", bumpers.leftPressed, bumpers.centerPressed, bumpers.rightPressed);
 }
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg){
@@ -220,11 +232,11 @@ float computeAngular(float targetHeading, float currentYaw){
     // Calculate proportional component and then calculate angularDeg based on if it is negative or positive
     float proportional = kp_r*(targetHeading-currentYaw);
 
-    if(proportional > 180){
+    while(proportional > 180){
         proportional -= 360;
     }
 
-    else if(proportional < -180){
+    while(proportional < -180){
         proportional += 360;
     }
 
@@ -259,11 +271,25 @@ void computeAdvanceCoordinate(float distance, float yaw, float posX, float posY,
     targetY = posY + dy;
 }
 
+void computeTargetCoordinate(float distance, float angle, float posX, float posY, float yaw, float &tgtX, float &tgtY){
+    tgtX = posX + distance * std::cos(Deg2Rad(angle + yaw));
+    tgtY = posY + distance * std::sin(Deg2Rad(angle + yaw));
+}
+
 void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     ROS_INFO("ROTATE TO HEADING CALLED");
     ros::spinOnce();
-
+    
     float proportional;
+    
+    while(targetHeading < -180){
+        targetHeading += 360;
+    }
+
+    while (targetHeading > 180){
+        targetHeading -= 360;
+    }
+
     while(abs(targetHeading - yaw) > rotationTolerance){
 
         angular = computeAngular(targetHeading, yaw);
@@ -274,7 +300,7 @@ void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publis
         vel.linear.x = linear;
         vel_pub.publish(vel);
 
-        ROS_INFO("Target/Current Yaw: %f/%f degs | Setpoint: %f degs/s", targetHeading, yaw, Rad2Deg(angular));
+        //ROS_INFO("Target/Current Yaw: %f/%f degs | Setpoint: %f degs/s", targetHeading, yaw, Rad2Deg(angular));
     }
 
     vel.angular.z = 0;
@@ -282,7 +308,6 @@ void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publis
     vel_pub.publish(vel);
 
 }
-
 
 void navigateToPosition(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     ROS_INFO("navigateToPosition() CALLED");
@@ -341,7 +366,7 @@ void navigateToPositionSmart(float tgtX, float tgtY, geometry_msgs::Twist &vel, 
     bool followingWall = false;
     bool obstacleAhead = false;
     float dx, dy, d;
-    float exitThreshold = 0.3;
+    float exitThreshold = 0.45;
 
     float sideOpenDistThreshold = 0.7;
 
@@ -395,9 +420,9 @@ void navigateToPositionSmart(float tgtX, float tgtY, geometry_msgs::Twist &vel, 
             angular = computeAngular(targetHeading, yaw);
             minAngular = 15;
 
-            if(counter %50000 == 0){
-                ROS_INFO("nTPS().2a | Tgt X/Y: %f/%f | Pos X/Y: %f/%f | Lin/Ang: %f/%f", tgtX, tgtY, posX, posY, linear, Rad2Deg(angular));
-            }
+            // if(counter %50000 == 0){
+            //     ROS_INFO("nTPS().2a | Tgt X/Y: %f/%f | Pos X/Y: %f/%f | Lin/Ang: %f/%f", tgtX, tgtY, posX, posY, linear, Rad2Deg(angular));
+            // }
             
         }
         
@@ -430,8 +455,8 @@ void navigateToPositionSmart(float tgtX, float tgtY, geometry_msgs::Twist &vel, 
                 // Wall following kinematics computation
                 if (distances.frontRay > 1.0) {
     
-                    const double k = 0.15;   // Scaling factor for angular velocity
-                    const double alpha = 2.3; // Exponential growth/decay rate
+                    const double k = 0.7;   // Scaling factor for angular velocity
+                    const double alpha = 1.5; // Exponential growth/decay rate
                     float targetDistance = 0.9;
 
                     if (distances.leftRay < targetDistance) {
@@ -470,7 +495,7 @@ void navigateToPositionSmart(float tgtX, float tgtY, geometry_msgs::Twist &vel, 
 
             else if (followingMode == "leftAdvanced"){
                 linear = 0.1;
-                angular = Deg2Rad((float) 11.4);
+                angular = Deg2Rad((float) 15);
                 
                 // Return to normal navigation if turned to the correct heading
                 if(std::abs(targetHeading - yaw) < headingThreshold && distances.frontRay > 0.51){
@@ -483,15 +508,281 @@ void navigateToPositionSmart(float tgtX, float tgtY, geometry_msgs::Twist &vel, 
 
             // 3B FOLLOW WALL ON RIGHT | Left distance is greater than right -> follow wall on right
             else if (followingMode == "right"){
+                // Wall following kinematics computation
+                if (distances.frontRay > 1.0) {
+                    const double k = 0.7;   // Scaling factor for angular velocity
+                    const double alpha = 1.5; // Exponential growth/decay rate
+                    float targetDistance = 0.9;
+
+                    if (distances.rightRay < targetDistance) {
+                        angular = k * (1-exp(-alpha * distances.rightRay)); // Exponential decay for left turns
+                        linear = 0.1;                                   // Set a constant forward speed
+                    } 
+                    else if (distances.rightRay > targetDistance) {
+                        angular = -k * (1-exp(-alpha * distances.rightRay));  // Exponential decay for right turns
+                        linear = 0.1;                                   // Set a constant forward speed
+                    } 
+                    else {
+                        angular = 0.0;                                  // No angular adjustment
+                        linear = 0.1;                                   // Maintain forward speed
+                    }
+                }
+
+                else {
+                    linear = 0.04;
+                    angular = 0.26;                     // Rotate in place to adjust to right
+                }
+
+                // Check if sudden opening
+                if(distances.rightHorzPrev < sideOpenDistThreshold && distances.rightHorz > sideOpenDistThreshold){
+                    ROS_INFO("OPENING DETECTED WHILE FOLLOWING WALL ON RIGHT");
+                    followingMode = "rightAdvanced";
+                    advanceDistance = distances.rightVertPrev + 0.1;
+                    float tgtX;
+                    float tgtY;
+
+                    computeAdvanceCoordinate(advanceDistance, yaw, posX, posY, tgtX, tgtY);
+                    navigateToPosition(tgtX, tgtY, vel, vel_pub);
+                }
                 //ROS_INFO("FOLLOWING WALL ON RIGHT");
             }
+        
+
+            else if (followingMode == "rightAdvanced"){
+                linear = 0.1;
+                angular = Deg2Rad((float) -15);
+                
+                // Return to normal navigation if turned to the correct heading
+                if(std::abs(targetHeading - yaw) < headingThreshold && distances.frontRay > 0.51){
+                    followingMode = "none";
+                    followingWall = false;
+
+                }
+                
+            }
+            
         }
+        // else {
+        //     linear = 0.0;
+        //     angular = 0.0;
+        //     ROS_INFO("navigateToPositionSmart: CASE NOT HANDLED");
+        // }
 
         vel.angular.z = angular;
         vel.linear.x = linear;
         vel_pub.publish(vel);
     }
 }
+
+void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+    ROS_INFO("handleBumperPressed() called...");
+    float reverseDistance = 0.2;
+    float forwardDistance = reverseDistance / std::cos(Deg2Rad(turnAngle)) * 0.9;
+
+    float exitDistanceThreshold = 0.02;
+
+    // 1. Reverse
+    ROS_INFO("handleBumperPressed() | Reversing...");
+    float x0 = posX;
+    float y0 = posY;
+    
+    float dx;
+    float dy;
+    float d = 0;
+
+    while((d-reverseDistance) < exitDistanceThreshold){
+        ros::spinOnce();
+        ROS_INFO("%.2f", d-reverseDistance);
+        ROS_INFO("%.2f", exitDistanceThreshold);
+
+        linear = -0.1;
+        angular = 0;
+
+        dx = posX-x0;
+        dy = posY-y0;
+        d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
+
+
+
+        vel.angular.z = angular;
+        vel.linear.x = linear;
+        vel_pub.publish(vel);
+    }
+
+
+    // 2. Turn
+    if(turnAngle == 0){ // If center bumper was pressed this is called
+        if(distances.leftRay > distances.rightRay){
+            turnAngle = 45;
+        }
+
+        else{
+            turnAngle = -45;
+        }
+
+    }
+    ROS_INFO("handleBumperPressed() | Turning...");
+    rotateToHeading(yaw + turnAngle, vel, vel_pub);
+
+    // 3. Drive Forward
+    ROS_INFO("handleBumperPressed() | Advancing...");
+    x0 = posX;
+    y0 = posY;
+    dx = 0;
+    dy = 0;
+    d = 0;
+    ROS_INFO("%.2f", d-forwardDistance);
+    while((d-forwardDistance) < exitDistanceThreshold){
+        ros::spinOnce();
+
+        linear = 0.1;
+        angular = 0;
+
+        dx = posX-x0;
+        dy = posY-y0;
+        d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
+
+
+
+        vel.angular.z = angular;
+        vel.linear.x = linear;
+        vel_pub.publish(vel);
+    }
+
+    // 4. Turn Back
+    ROS_INFO("handleBumperPressed() | Correcting yaw...");
+    rotateToHeading(yaw - turnAngle, vel, vel_pub);
+
+
+
+    ROS_INFO("handleBumperPressed() | END");
+    linear = 0;
+    angular = 0;
+
+    vel.angular.z = angular;
+    vel.linear.x = linear;
+    vel_pub.publish(vel);
+
+    return;
+
+}
+
+float distanceBetween(float x1, float y1, float x2, float y2){
+    return sqrt(pow((x1-x2),2) + pow((y1-y2),2));
+}
+
+void wrapIntegerIndexAroundRange(int &index, int start, int end){
+    int range = end-start + 1;
+    while(index > end){
+        index -= range; 
+    }
+    
+    while(index < start){
+        index += range;
+    }
+}
+
+void findClosestCorner(std::array<std::array<float, 2>, 4> cornerCoords, float posX, float posY, float &closestX, float &closestY, int &closestInd){
+    std::array<float,2> closestCoordinate;
+    float closestDistance;
+    
+    closestInd = 0;
+    closestCoordinate = cornerCoords[0];
+    closestDistance = distanceBetween(posX, posY, closestCoordinate[0], closestCoordinate[1]);
+    
+    float distance;
+    for(int i = 1; i < 4; i++){
+        distance = distanceBetween(posX, posY, cornerCoords[i][0], cornerCoords[i][1]);
+        if(distance < closestDistance){
+            closestCoordinate = cornerCoords[i];
+            closestDistance = distance;
+            closestInd = i;
+        }
+    }
+    
+    closestX = closestCoordinate[0];
+    closestY = closestCoordinate[1];
+}
+
+void computeZigZag(std::array<std::array<float,2>,4> cornerCoords, int closestInd, std::vector<std::array<float,2>> &zigZagPoints){
+    // Key Parameters
+    float minSegmentLength = 1.5;
+    
+    // 1. Get the indices of the adjacent corners to the closest corner
+    int nextInd = closestInd + 1;
+    wrapIntegerIndexAroundRange(nextInd, 0, 3);
+    
+    int prevInd = closestInd - 1;
+    wrapIntegerIndexAroundRange(prevInd, 0, 3);
+    
+    // 2. Find which of the two adjacent corners is farther away
+    int indAStart = closestInd;
+    int indAEnd;
+    float distanceNext = distanceBetween(cornerCoords[closestInd][0], cornerCoords[closestInd][1], cornerCoords[nextInd][0], cornerCoords[nextInd][1]);
+    float distancePrev = distanceBetween(cornerCoords[closestInd][0], cornerCoords[closestInd][1], cornerCoords[prevInd][0], cornerCoords[prevInd][1]);
+    
+    if(distanceNext > distancePrev){
+        indAEnd = nextInd;
+    }
+    else{
+        indAEnd = prevInd;
+    }
+    
+    // 3. Find A-side and B-side displacements; A-side is the closer long span and B-side is the farther long span
+    float dxA;
+    float dyA;
+    float dA;
+    
+    dxA = cornerCoords[indAEnd][0]-cornerCoords[indAStart][0];
+    dyA = cornerCoords[indAEnd][1]-cornerCoords[indAStart][1];
+    dA = sqrt(pow(dxA, 2) + pow(dyA, 2));
+    
+    float dxB;
+    float dyB;
+    
+    int indBStart = indAStart + (indAStart-indAEnd);
+    int indBEnd = indAStart + 2*(indAStart-indAEnd);
+    
+    wrapIntegerIndexAroundRange(indBStart, 0, 3);
+    wrapIntegerIndexAroundRange(indBEnd, 0, 3);
+    
+    dxB = cornerCoords[indBEnd][0]-cornerCoords[indBStart][0];
+    dyB = cornerCoords[indBEnd][1]-cornerCoords[indBStart][1];
+
+    //4. Calculate nSegments and segmentDisplacementA/segmentDisplacementB (sxA, syA, sxB, syB)
+    int nSegmentsA = std::ceil(dA/minSegmentLength);
+    
+    int nSegmentsB = nSegmentsA + 1;
+    
+    float sxA = dxA / nSegmentsA;
+    float syA = dyA / nSegmentsA;
+    
+    float sxB = dxB / nSegmentsB;
+    float syB = dyB / nSegmentsB;
+    
+    //5. Calculate zigzag positions
+    float pxA;
+    float pyA;
+    float pxB;
+    float pyB;
+    
+    for(int i = 0; i < nSegmentsA + 1; i++){
+        pxA = cornerCoords[indAStart][0] + sxA*i;
+        pyA = cornerCoords[indAStart][1] + syA*i;
+        zigZagPoints.push_back({pxA, pyA});
+        
+        if( i < nSegmentsB - 1){
+            pxB = cornerCoords[indBStart][0] + sxB*(i+1);
+            pyB = cornerCoords[indBStart][1] + syB*(i+1);
+            zigZagPoints.push_back({pxB, pyB});
+        }
+    }
+    
+    // for(int i = 0; i < zigZagPoints.size(); i++){
+    //     std::cout << "(" << zigZagPoints[i][0]<< "," << zigZagPoints[i][1] << ")" << std::endl;
+    // } 
+}
+
 
 
 
@@ -515,17 +806,6 @@ int main(int argc, char **argv)
     start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
 
-    // Bumper Event Settings
-    bool bumperStepBack = false;
-    uint64_t tBumperEventStart;
-    uint64_t dBumperStepBack = 2;
-
-    uint64_t dBumperEvent[4] = {3,7,3,7};
-    uint64_t dBumperEventTotal = 0;
-    for(int i = 0; i < sizeof(dBumperEvent)/sizeof(*dBumperEvent); i++){
-        dBumperEventTotal += dBumperEvent[i];
-    }
-
     angular = 0.0;
     linear = 0.0;
 
@@ -541,50 +821,95 @@ int main(int argc, char **argv)
     // navigateToPositionSmart(2.285,-1.422, vel, vel_pub);
     // navigateToPositionSmart(2.3149999999999995,1.708, vel, vel_pub);
 
-    navigateToPositionSmart(-2, 0, vel, vel_pub);
+    // navigateToPositionSmart(-2, 0, vel, vel_pub);
 
-    return 0;
+    // return 0;
+
+    std::array<std::array<float, 2>, 4> cornerCoords = {{
+        {-1.929,1.346},
+        {-1.7069999999999999,-1.0},
+        {2.285,-1.422},
+        {2.3149999999999995,1.708}
+    }};
+
+    int closestInd;
+    float closestX;
+    float closestY;
+
+    findClosestCorner(cornerCoords, posX, posY, closestX, closestY, closestInd);
+    computeZigZag(cornerCoords, closestInd, zigZagPoints);
+
+    float zpX;
+    float zpY;
+    for(int i = 0; i < zigZagPoints.size(); i++){
+        zpX = zigZagPoints[i][0];
+        zpY = zigZagPoints[i][1];
+
+        ROS_INFO("zz navigating to: x/y %.2f/%.2f", zpX, zpY);
+
+        navigateToPositionSmart(zpX, zpY, vel, vel_pub);
+    }
+
+
+
+
 
     while(ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
         
-        #pragma region Bumper
-        // Bumper Event
-        if(leftBumperPressed || centerBumperPressed || rightBumperPressed){
-            bumperStepBack = true;
-            tBumperEventStart = secondsElapsed;
-        }
 
-        if(bumperStepBack){
-            uint64_t dBumperEventRemaining = secondsElapsed - tBumperEventStart;
-
-            if(dBumperEventRemaining < dBumperEvent[0]){
-                linear = -0.1;
-                angular = 0.0;
-            }
-            
-            else if(dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1]){
-                linear = 0.0;
-                angular = Deg2Rad(15);
+        if(bumpers.anyPressed){
+            if(bumpers.leftPressed){
+                handleBumperPressed((float) -45.0, vel, vel_pub);
             }
 
-            else if(dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2]){
-                linear = 0.1;
-                angular = 0.0;
-            } 
-            
-            else if (dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2] + dBumperEvent[3]){
-                linear = 0.0;
-                angular = Deg2Rad(-15);
+            else if(bumpers.rightPressed){
+                handleBumperPressed((float) 45.0, vel, vel_pub);
             }
 
-            else{
-                bumperStepBack = false;
-                angular = 0.0;
-                linear = 0.1;
+            else if(bumpers.centerPressed){
+                handleBumperPressed((float) 0.0, vel, vel_pub);
             }
         }
-        #pragma endregion
+        
+
+        // #pragma region Bumper
+        // // Bumper Event
+        // if(leftBumperPressed || centerBumperPressed || rightBumperPressed){
+        //     bumperStepBack = true;
+        //     tBumperEventStart = secondsElapsed;
+        // }
+
+        // if(bumperStepBack){
+        //     uint64_t dBumperEventRemaining = secondsElapsed - tBumperEventStart;
+
+        //     if(dBumperEventRemaining < dBumperEvent[0]){
+        //         linear = -0.1;
+        //         angular = 0.0;
+        //     }
+            
+        //     else if(dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1]){
+        //         linear = 0.0;
+        //         angular = Deg2Rad(15);
+        //     }
+
+        //     else if(dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2]){
+        //         linear = 0.1;
+        //         angular = 0.0;
+        //     } 
+            
+        //     else if (dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2] + dBumperEvent[3]){
+        //         linear = 0.0;
+        //         angular = Deg2Rad(-15);
+        //     }
+
+        //     else{
+        //         bumperStepBack = false;
+        //         angular = 0.0;
+        //         linear = 0.1;
+        //     }
+        // }
+        // #pragma endregion
 
         vel.angular.z = angular;
         vel.linear.x = linear;
