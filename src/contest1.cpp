@@ -81,7 +81,6 @@ ros::Publisher vel_pub;
 #pragma endregion
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
-    void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg) {
     bumper[msg->bumper] = msg->state;
     bool leftBumperPressed = bumper[kobuki_msgs::BumperEvent::LEFT];
     bool centerBumperPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
@@ -106,31 +105,30 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
         pose_pub.publish(pose);
 
         // Create and publish a marker
-        static int marker_id = 0; // Static variable to keep track of marker IDs
+        static int marker_id = 0;
         visualization_msgs::Marker marker;
-        marker.header.frame_id = "map"; // or "odom" depending on frame
+        marker.header.frame_id = "map";
         marker.header.stamp = ros::Time::now();
         marker.ns = "bumper_markers";
-        marker.id = marker_id++; // Increment marker ID for each new marker
+        marker.id = marker_id++;
         marker.type = visualization_msgs::Marker::SPHERE;
         marker.action = visualization_msgs::Marker::ADD;
         marker.pose.position.x = posX;
         marker.pose.position.y = posY;
         marker.pose.position.z = 0.0;
         marker.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
-        marker.scale.x = 0.2; // Size of the marker
+        marker.scale.x = 0.2;
         marker.scale.y = 0.2;
         marker.scale.z = 0.2;
-        marker.color.a = 1.0; // Alpha
-        marker.color.r = 1.0; // Red
-        marker.color.g = 0.0; // Green
-        marker.color.b = 0.0; // Blue
+        marker.color.a = 1.0;
+        marker.color.r = 1.0;
+        marker.color.g = 0.0;
+        marker.color.b = 0.0;
 
         marker_pub.publish(marker);
     }
 }
 
-}
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
     posX = msg->pose.pose.position.x;
     posY = msg->pose.pose.position.y;
@@ -563,10 +561,10 @@ void get_coord() {
     }
 
     // Display the full list of stored coordinates
-    // ROS_INFO("Current list of stored coordinates:");
-    // for (const auto& coord : positions) {
-    //     // ROS_INFO("X: %.2f, Y: %.2f", coord.first, coord.second);
-    // }
+    ROS_INFO("Current list of stored coordinates:");
+    for (const auto& coord : positions) {
+        // ROS_INFO("X: %.2f, Y: %.2f", coord.first, coord.second);
+    }
 }
 
 // Calculate Euclidean distance between two points
@@ -796,7 +794,7 @@ int main(int argc, char **argv) {
 
             // Call the wall-following function
             wallFollowing(wall_side, curr_turn, prev_turn, left_dist, right_dist, front_dist, 
-              target_distance, min_speed, k, alpha, vel, vel_pub);
+            target_distance, min_speed, k, alpha, vel, vel_pub);
         }
 
         // **存储当前激光读数，供下一次循环比较**
@@ -833,6 +831,5 @@ int main(int argc, char **argv) {
 	        break;  // Stop the loop if visited position
         }
     }
-
     return 0;
 }
