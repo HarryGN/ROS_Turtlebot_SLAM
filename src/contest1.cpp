@@ -260,16 +260,16 @@ void get_coord() {
 
     if (!is_visited) {
         positions.push_back(std::make_pair(posX, posY)); // Only store new coordinates
-        ROS_INFO("Stored coordinates: (%f, %f)", posX, posY);
+        // ROS_INFO("Stored coordinates: (%f, %f)", posX, posY);
     } else {
         ROS_INFO("Coordinates (%f, %f) already visited, not storing again.", posX, posY);
     }
 
     // Display the full list of stored coordinates
-    ROS_INFO("Current list of stored coordinates:");
-    for (const auto& coord : positions) {
-        ROS_INFO("X: %.2f, Y: %.2f", coord.first, coord.second);
-    }
+    // ROS_INFO("Current list of stored coordinates:");
+    // for (const auto& coord : positions) {
+    //     // ROS_INFO("X: %.2f, Y: %.2f", coord.first, coord.second);
+    // }
 }
 
 // Calculate Euclidean distance between two points
