@@ -36,7 +36,6 @@ struct OrthogonalDist {
 // Global Variables
 double posX = 0., posY = 0., yaw = 0.;
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
-ros::Publisher vel_pub;
 LaserScanData laser_data;
 OrthogonalDist orthogonal_dist;
 float full_angle = 57;
@@ -46,8 +45,7 @@ int front_idx = 0;     // 前方激光索引
 int left_idx = 0;      // 左侧激光索引
 // Create a vector to store positions
 std::vector<std::pair<double, double>> positions;
-
-
+ros::Publisher vel_pub;
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg) {
     bumper[msg->bumper] = msg->state;
@@ -384,7 +382,6 @@ std::vector<std::pair<double, double>> get_all_corners() {
     return all_corners;
 }
 
-
 int main(int argc, char **argv) {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
@@ -422,11 +419,13 @@ int main(int argc, char **argv) {
     while (ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
 
+        
         get_coord();  //store positions
         std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
         // Print corner coord
         ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
         ROS_INFO("Corner 2: (%.2f, %.2f)", corners.second.first, corners.second.second);
+
 
 
         float front_dist = std::isnan(laser_data.front_distance) ? safe_threshold : laser_data.front_distance;
@@ -499,7 +498,8 @@ int main(int argc, char **argv) {
             // ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
 
             // Call the wall-following function
-            wallFollowing(wall_side, curr_turn, prev_turn, left_dist, front_dist, target_distance, min_speed, k, alpha, vel);
+            wallFollowing(wall_side, curr_turn, prev_turn, left_dist, right_dist, front_dist, 
+              target_distance, min_speed, k, alpha, vel);
         }
 
         // **存储当前激光读数，供下一次循环比较**
@@ -518,8 +518,7 @@ int main(int argc, char **argv) {
         ).count();
 
         loop_rate.sleep();
-
-////////////////////////////////////////////////////////////////coordinate break check////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////coordinate break check////////////////////////////////////////////////////
         // Check if the robot has returned to a previous position
         // Then start zig-zag. Need to incorporate
         if (is_position_visited(posX, posY)) {
