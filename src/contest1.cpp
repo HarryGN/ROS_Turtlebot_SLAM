@@ -18,6 +18,8 @@
 #define N_BUMPER (3)
 #define RAD2DEG(rad) ((rad) * 180. / M_PI)
 #define DEG2RAD(deg) ((deg) * M_PI / 180.)
+#define Rad2Deg(rad) ((rad) * 180. / M_PI)
+#define Deg2Rad(deg) ((deg) * M_PI / 180.)
 
 // Struct to hold laser scan data
 struct LaserScanData {
@@ -33,9 +35,38 @@ struct OrthogonalDist {
     float right_distance;
 };
 
-// Global Variables
-double posX = 0., posY = 0., yaw = 0.;
+#pragma region Bumper variable
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
+
+struct BumpersStruct{
+    bool leftPressed;
+    bool centerPressed;
+    bool rightPressed;
+    bool anyPressed;
+};
+
+BumpersStruct bumpers;
+
+#pragma endregion
+// Global Variables
+#pragma region Global Variable
+float angular;
+float linear;
+float posX = 0.0, posY = 0.0, yaw = 0.0;
+
+float rotationTolerance = Deg2Rad(1);
+float kp_r = 1;
+float kn_r = 0.7;
+float minAngular = 15; // Degrees per second
+float maxAngular = 90; // Degrees per second
+
+float navigationTolerance = 0.05;
+float kp_n = 0.02;
+float kn_n = 0.5;
+float minLinear = 0.1;
+float maxLinear = 0.45;
+bool prev_turn = false;
+bool curr_turn = false;
 LaserScanData laser_data;
 OrthogonalDist orthogonal_dist;
 float full_angle = 57;
@@ -46,15 +77,22 @@ int left_idx = 0;      // 左侧激光索引
 // Create a vector to store positions
 std::vector<std::pair<double, double>> positions;
 ros::Publisher vel_pub;
+#pragma endregion
 
-void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg) {
+void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     bumper[msg->bumper] = msg->state;
-}
+    bumpers.leftPressed = bumper[kobuki_msgs::BumperEvent::LEFT];
+    bumpers.centerPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
+    bumpers.rightPressed = bumper[kobuki_msgs::BumperEvent::RIGHT];
 
+    bumpers.anyPressed = bumpers.leftPressed || bumpers.centerPressed || bumpers.rightPressed;
+
+    ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", bumpers.leftPressed, bumpers.centerPressed, bumpers.rightPressed);
+}
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
     posX = msg->pose.pose.position.x;
     posY = msg->pose.pose.position.y;
-    yaw = tf::getYaw(msg->pose.pose.orientation);
+    yaw = RAD2DEG(tf::getYaw(msg->pose.pose.orientation));
     // //ROS_INFO("(x,y):(%f,%f) Orint: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
     // ROS_INFO("(x,y):(%f,%f).", posX, posY);
 }
@@ -147,6 +185,204 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
              laser_data.right_distance, laser_data.min_distance);
 }
 
+
+/// @brief bumper related function/////////////////////////////////////////////////////////////////////////////////////////////
+/// @param turnAngle 
+/// @param vel 
+/// @param vel_pub /
+void applyMagnitudeLimits(float &value, float lowerLimit, float upperLimit){
+    if(value < 0){
+        if(value < -upperLimit){
+            value = -upperLimit;
+        }
+        else if(value > -lowerLimit){
+            value = -lowerLimit;
+        }
+    }
+
+    else if(value > 0){
+        if(value > upperLimit){
+            value = upperLimit;
+        }
+        else if(value < lowerLimit){
+            value = lowerLimit;
+        }
+    }
+}
+
+float computeAngular(float targetHeading, float currentYaw){
+    float angularDeg;
+
+    // Calculate proportional component and then calculate angularDeg based on if it is negative or positive
+    float proportional = kp_r*(targetHeading-currentYaw);
+
+    while(proportional > 180){
+        proportional -= 360;
+    }
+
+    while(proportional < -180){
+        proportional += 360;
+    }
+
+
+    if(proportional < 0){
+        angularDeg = (float) -1*pow(-1*proportional, kn_r);
+    }
+    else{
+        angularDeg = (float) pow(proportional, kn_r);
+    }
+
+    applyMagnitudeLimits(angularDeg, minAngular, maxAngular);
+
+    return Deg2Rad(angularDeg);
+}
+
+void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+    ROS_INFO("ROTATE TO HEADING CALLED");
+    ros::spinOnce();
+    
+    float proportional;
+    
+    while(targetHeading < -180){
+        targetHeading += 360;
+    }
+
+    while (targetHeading > 180){
+        targetHeading -= 360;
+    }
+
+    while(abs(targetHeading - yaw) > rotationTolerance){
+
+        angular = computeAngular(targetHeading, yaw);
+        linear = 0;
+
+        ros::spinOnce();
+        vel.angular.z = angular;
+        vel.linear.x = linear;
+        vel_pub.publish(vel);
+
+        ROS_INFO("Target/Current Yaw: %f/%f degs | Setpoint: %f degs/s", targetHeading, yaw, Rad2Deg(angular));
+    }
+
+    vel.angular.z = 0;
+    vel.linear.x = 0;
+    vel_pub.publish(vel);
+
+}
+
+void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+    ROS_INFO("handleBumperPressed() called...");
+    float reverseDistance = 0.2;
+    float forwardDistance = reverseDistance / std::cos(Deg2Rad(turnAngle)) * 0.9;
+
+    float exitDistanceThreshold = 0.02;
+
+    // 1. Reverse
+    ROS_INFO("handleBumperPressed() | Reversing...");
+    float x0 = posX;
+    float y0 = posY;
+    
+    float dx;
+    float dy;
+    float d = 0;
+
+    while((d-reverseDistance) < exitDistanceThreshold){
+        ros::spinOnce();
+        ROS_INFO("%.2f", d-reverseDistance);
+        ROS_INFO("%.2f", exitDistanceThreshold);
+
+        linear = -0.1;
+        angular = 0;
+
+        dx = posX-x0;
+        dy = posY-y0;
+        d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
+
+
+
+        vel.angular.z = angular;
+        vel.linear.x = linear;
+        vel_pub.publish(vel);
+    }
+
+
+    // 2. Turn
+    if(turnAngle == 0){ // If center bumper was pressed this is called
+        if(laser_data.left_distance > laser_data.right_distance){
+            turnAngle = 45;
+        }
+
+        else{
+            turnAngle = -45;
+        }
+
+    }
+    ROS_INFO("handleBumperPressed() | Turning...");
+    rotateToHeading(yaw + turnAngle, vel, vel_pub);
+
+    // 3. Drive Forward
+    ROS_INFO("handleBumperPressed() | Advancing...");
+    x0 = posX;
+    y0 = posY;
+    dx = 0;
+    dy = 0;
+    d = 0;
+    ROS_INFO("%.2f", d-forwardDistance);
+    while((d-forwardDistance) < exitDistanceThreshold){
+        ros::spinOnce();
+
+        linear = 0.1;
+        angular = 0;
+
+        dx = posX-x0;
+        dy = posY-y0;
+        d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
+
+
+
+        vel.angular.z = angular;
+        vel.linear.x = linear;
+        vel_pub.publish(vel);
+    }
+
+    // 4. Turn Back
+    ROS_INFO("handleBumperPressed() | Correcting yaw...");
+    rotateToHeading(yaw - turnAngle * 0.5, vel, vel_pub);
+
+
+
+    ROS_INFO("handleBumperPressed() | END");
+    linear = 0;
+    angular = 0;
+
+    vel.angular.z = angular;
+    vel.linear.x = linear;
+    vel_pub.publish(vel);
+
+    return;
+
+}
+
+void bumper_handling (geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+    if(bumpers.anyPressed){
+        if(bumpers.leftPressed){
+            handleBumperPressed((float) -45.0, vel, vel_pub);
+        }
+
+        else if(bumpers.rightPressed){
+            handleBumperPressed((float) 45.0, vel, vel_pub);
+        }
+
+        else if(bumpers.centerPressed){
+            handleBumperPressed((float) 0.0, vel, vel_pub);
+        }
+        }
+}
+
+/// @brief wall following related function/////////////////////////////////////////////////////////////////////////////////////
+/// @param turnAngle 
+/// @param vel 
+/// @param vel_pub /
 // Define an enumeration for wall side
 enum WallSide { LEFT, RIGHT };
 
@@ -192,7 +428,9 @@ void rotateRobot(double angular_speed, double duration) {
 
 
 // Function to perform wall-following logic
-void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel) {
+void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel, ros::Publisher &vel_pub) {
+    
+    bumper_handling(vel, vel_pub);
     // **Wall-Following Logic**
     if (front_dist > 0.9) {
         if (wall_side == LEFT) {
@@ -215,6 +453,7 @@ void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float lef
             }
         }
     } 
+
     else if (front_dist < 0.9 & left_dist < 0.9 & right_dist < 0.9 & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("surrounded by three walls");
@@ -223,14 +462,14 @@ void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float lef
         curr_turn = true;
         
     }
-    else if (front_dist < 0.9 & left_dist < 0.9 & right_dist > 0.9) {
+    else if (front_dist < 0.9 & left_dist < 0.9 & right_dist > 0.9  & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("Turn to the right");
         rotateRobot(-0.25, 6.28);
         rotateRobot(0, 0);
         curr_turn = true;
     }
-    else if (front_dist < 0.9 & left_dist > 0.9 & right_dist < 0.9) {
+    else if (front_dist < 0.9 & left_dist > 0.9 & right_dist < 0.9 & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("Turn to the left");
         rotateRobot(0.25, 6.28);
@@ -382,6 +621,8 @@ std::vector<std::pair<double, double>> get_all_corners() {
     return all_corners;
 }
 
+
+
 int main(int argc, char **argv) {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
@@ -399,8 +640,8 @@ int main(int argc, char **argv) {
 
     const float target_distance = 0.9;
     const float safe_threshold = 1.0;  // Safe distance threshold
-    const double k = 0.16;   // Scaling factor for angular velocity
-    const double alpha = 1.6; // Exponential growth/decay rate
+    const double k = 0.18;   // Scaling factor for angular velocity
+    const double alpha = 1.8; // Exponential growth/decay rate
     const float max_speed = 0.25;  // Max linear speed
     const float min_speed = 0.1;   // Min linear speed
     float current_x;
@@ -409,8 +650,6 @@ int main(int argc, char **argv) {
     float delta_y;
     int corridor_count = 0;
     bool wall_following = false;
-    bool prev_turn = false;
-    bool curr_turn = false;
 
     // 全局变量：存储上一帧的左/右激光读数
     float prev_left_distance = 0.0, prev_right_distance = 0.0;
@@ -499,7 +738,7 @@ int main(int argc, char **argv) {
 
             // Call the wall-following function
             wallFollowing(wall_side, curr_turn, prev_turn, left_dist, right_dist, front_dist, 
-              target_distance, min_speed, k, alpha, vel);
+              target_distance, min_speed, k, alpha, vel, vel_pub);
         }
 
         // **存储当前激光读数，供下一次循环比较**
