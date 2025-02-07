@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Rostest",
+            "type": "rostest",
+            "request": "launch",
+            "test": "${workspaceFolder}/test/test_contest1.test",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false
+        }
+    ]
+}

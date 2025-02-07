@@ -56,11 +56,12 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg) {
         pose_pub.publish(pose);
 
         // Create and publish a marker
+        static int marker_id = 0; // Static variable to keep track of marker IDs
         visualization_msgs::Marker marker;
-        marker.header.frame_id = "map"; // or "odom" depending on your frame
+        marker.header.frame_id = "map"; // or "odom" depending on frame
         marker.header.stamp = ros::Time::now();
         marker.ns = "bumper_markers";
-        marker.id = msg->bumper; // Use bumper ID to differentiate markers
+        marker.id = marker_id++; // Increment marker ID for each new marker
         marker.type = visualization_msgs::Marker::SPHERE;
         marker.action = visualization_msgs::Marker::ADD;
         marker.pose.position.x = posX;
