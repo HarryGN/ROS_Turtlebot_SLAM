@@ -5,6 +5,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_datatypes.h>
+#include <visualization_msgs/Marker.h>    // Added include for visualization_msgs::Marker
 
 #include <unordered_map>
 #include <cmath>
