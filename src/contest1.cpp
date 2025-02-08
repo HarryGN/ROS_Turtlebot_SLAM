@@ -3,10 +3,8 @@
 #include <geometry_msgs/Twist.h>
 #include <kobuki_msgs/BumperEvent.h>
 #include <sensor_msgs/LaserScan.h>
-
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_datatypes.h>
-
 #include <stdio.h>
 #include <cmath>
 
@@ -29,41 +27,12 @@ struct Point {
     float y;
 };
 
-// Define the occupancy grid and its properties
-struct OccupancyGrid {
-    int width, height;
-    float resolution;
-    std::vector<int> state; // -1 = unknown, 0 = free, 1 = occupied
-
-    OccupancyGrid(int w, int h, float res) : width(w), height(h), resolution(res), state(w * h, -1) {}
-
-    // Method to update cell based on world coordinates
-    void updateCell(float worldX, float worldY, int value) {
-        int gridX = static_cast<int>(floor(worldX / resolution) + width / 2);
-        int gridY = static_cast<int>(floor(worldY / resolution) + height / 2);
-        if (gridX >= 0 && gridX < width && gridY >= 0 && gridY < height) {
-            state[gridY * width + gridX] = value;
-        }
-    }
-
-    // Method to get the value at a specific cell
-    int getCell(int gridX, int gridY) const {
-        if (gridX >= 0 && gridX < width && gridY >= 0 && gridY < height) {
-            return state[gridY * width + gridX];
-        }
-        return -1; // Return -1 for out of bounds
-    }
-};
-
-
 double posX = 0., posY = 0., yaw = 0.;
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 float angular = 0.0;
 float linear = 0.0;
 float minLaserDist = std::numeric_limits<float>::infinity();
-
 float left_distance = 0.0, right_distance = 0.0, front_distance = 0.0;
-// float maxLaserDist = std::numeric_limits<float>::();
 int32_t nLasers=0, desiredNLasers=0, desiredAngle=5;
 
 // Create a vector to store positions
@@ -82,28 +51,6 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
     //ROS_INFO("(x,y):(%f,%f) Orint: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
     ROS_INFO("(x,y):(%f,%f).", posX, posY);
 }
-
-/*
-// Get all the scanned data (number of laser = 639)
-void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
-    int   = (msg->angle_max - msg->angle_min) / msg->angle_increment;
-    // ROS_INFO("Number of Lasers: %d", nLasers);
-
-    std::vector<std::pair<float, float>> distance_angle_pairs;
-
-    for (int i = 0; i < nLasers; ++i) {
-        float angle = msg->angle_min + i * msg->angle_increment;
-        float distance = msg->ranges[i];
-        float angle_deg = RAD2DEG(angle);
-
-        // Store each distance and its corresponding angle
-        distance_angle_pairs.push_back(std::make_pair(distance, angle_deg));
-
-        ROS_INFO("Angle: %.2f degrees, Distance: %.2f meters", angle_deg, distance);
-    }
-}
-*/
-
 
 void computeAdvanceCoordinate(float distance, float angle_rad, float posX, float posY, float &targetX, float &targetY){
     float dx = distance * std::cos(angle_rad);
@@ -192,7 +139,6 @@ double get_total_dist() {
     return total_dist;
 }
 
-// Check if the [corner coordinate] is set
 // Check if the first cornor coordinate is visited. Robot need to travel at least min_distance
 // Need to tune the threshold -----------------------------------------------------------------------------------------------------
 bool is_position_visited(double x, double y, double threshold = 1.0, double min_distance = 4) {
@@ -215,10 +161,8 @@ bool is_position_visited(double x, double y, double threshold = 1.0, double min_
     }
     return false; // Position has not been visited
 }
-
 // ---------------------------------------------------------------------------------------------------------------------------------
 
-// calculate the perpendicular distance from a point to a line defined by two points (corner1 and corner2)
 double point_to_line_distance(const std::pair<double, double>& point, const std::pair<double, double>& line_start, const std::pair<double, double>& line_end) {
     double normal_length = std::hypot(line_end.first - line_start.first, line_end.second - line_start.second);
     return std::abs((point.first - line_start.first) * (line_end.second - line_start.second) - (point.second - line_start.second) * (line_end.first - line_start.first)) / normal_length;
@@ -229,7 +173,6 @@ int line_side(const std::pair<double, double>& point, const std::pair<double, do
     return (result > 0) ? 1 : (result < 0) ? -1 : 0;
 }
 
-// find additional diagonal corners based on maximum perpendicular distance
 std::vector<std::pair<double, double>> get_all_corners() {
     std::vector<std::pair<double, double>> all_corners;
     std::pair<std::pair<double, double>, std::pair<double, double>> far_corners = filter_corner();
@@ -301,6 +244,8 @@ int main(int argc, char **argv)
 
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
+
+        
         /*
         if (front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)) {
     
@@ -332,8 +277,7 @@ int main(int argc, char **argv)
         secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
         loop_rate.sleep();
 
-        // Check if the robot has returned to a previous position
-        // Then start zig-zag. Need to incorporate
+        // End condition for 1 full round
         if (is_position_visited(posX, posY)) {
             ROS_INFO("Robot has completed a round and returned to previous position.");
             
