@@ -35,8 +35,16 @@ float minLaserDist = std::numeric_limits<float>::infinity();
 float left_distance = 0.0, right_distance = 0.0, front_distance = 0.0;
 int32_t nLasers=0, desiredNLasers=0, desiredAngle=5;
 
-// Create a vector to store positions
+Point furthestPoint;  // store the coordinates of the furthest point
+double furthestDistance = 0;
+
+// Vector to store VISITED coordinates
 std::vector<std::pair<double, double>> positions;
+
+// Vector to store laser scanned coordinates
+std::vector<Point> global_scan_points;
+
+// Vector to store 
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
 {
@@ -60,9 +68,15 @@ void computeAdvanceCoordinate(float distance, float angle_rad, float posX, float
     targetY = posY + dy;
 }
 
+double calculate_distance(const std::pair<double, double>& p1, const std::pair<double, double>& p2) {
+    return std::sqrt(std::pow(p2.first - p1.first, 2) + std::pow(p2.second - p1.second, 2));
+}
+
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
+    furthestDistance = 0;
+    
+    global_scan_points.clear();  // clear previous scan points
     int nLasers = (msg->angle_max - msg->angle_min) / msg->angle_increment;
-    std::vector<Point> scanPoints;
 
     for (int i = 0; i < nLasers; ++i) {
         float angle = msg->angle_min + i * msg->angle_increment;
@@ -72,11 +86,12 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
             float targetX, targetY;
             // Calculate global position of the scan point
             computeAdvanceCoordinate(distance, angle + yaw, posX, posY, targetX, targetY);
-            scanPoints.push_back({targetX, targetY});
+            global_scan_points.push_back({targetX, targetY});
             ROS_INFO(" Global X: %.2f, Y: %.2f", targetX, targetY);
         }
     }
 }
+
 
 // Store the current coordinates in the position vector
 void get_coord() {
@@ -103,9 +118,6 @@ void get_coord() {
     */
 }
 
-double calculate_distance(const std::pair<double, double>& p1, const std::pair<double, double>& p2) {
-    return std::sqrt(std::pow(p2.first - p1.first, 2) + std::pow(p2.second - p1.second, 2));
-}
 
 // find the corner coordinates with the largest distance between them
 std::pair<std::pair<double, double>, std::pair<double, double>> filter_corner() {
@@ -245,7 +257,7 @@ int main(int argc, char **argv)
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
 
-        
+
         /*
         if (front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)) {
     
