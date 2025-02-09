@@ -25,6 +25,7 @@
 struct Point {
     float x;
     float y;
+    double angle;
 };
 
 double posX = 0., posY = 0., yaw = 0.;
@@ -74,24 +75,42 @@ double calculate_distance(const std::pair<double, double>& p1, const std::pair<d
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     furthestDistance = 0;
-    
     global_scan_points.clear();  // clear previous scan points
+
     int nLasers = (msg->angle_max - msg->angle_min) / msg->angle_increment;
 
     for (int i = 0; i < nLasers; ++i) {
         float angle = msg->angle_min + i * msg->angle_increment;
         float distance = msg->ranges[i];
 
-        if (!std::isnan(distance)) {  // Check if distance is nan
+        if (!std::isnan(distance)) {
             float targetX, targetY;
-            // Calculate global position of the scan point
+            // Calculate global position
             computeAdvanceCoordinate(distance, angle + yaw, posX, posY, targetX, targetY);
-            global_scan_points.push_back({targetX, targetY});
+            global_scan_points.push_back({targetX, targetY, (angle + yaw)});   // store absolute angle
             ROS_INFO(" Global X: %.2f, Y: %.2f", targetX, targetY);
+
+            // Check if this point is furthest
+            if (distance > furthestDistance) {
+                furthestDistance = distance;
+                furthestPoint.x = targetX;
+                furthestPoint.y = targetY;
+                furthestPoint.angle = angle + yaw;
+            }
         }
+    }
+    if (furthestDistance > 0){
+        ROS_INFO("Furthest Point: Global (%2f, %2f), abs angle: %2f", furthestPoint.x, furthestPoint.y, RAD2DEG(furthestPoint.angle));
     }
 }
 
+Point getFurthestPoint(){
+    return furthestPoint;
+}
+
+const std::vector<Point>& getAllScanPoints(){
+    return global_scan_points;
+}
 
 // Store the current coordinates in the position vector
 void get_coord() {
@@ -105,7 +124,7 @@ void get_coord() {
 
     if (!is_visited) {
         positions.push_back(std::make_pair(posX, posY)); // Only store new coordinates
-        ROS_INFO("Stored coordinates: (%f, %f)", posX, posY);
+        // ROS_INFO("Stored coordinates: (%f, %f)", posX, posY);
     } else {
         // ROS_INFO("Coordinates (%f, %f) already visited, not storing again.", posX, posY);
     }
@@ -251,8 +270,8 @@ int main(int argc, char **argv)
         get_coord();  //store positions
         std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
         // Print corner coord
-        ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
-        ROS_INFO("Corner 2: (%.2f, %.2f)", corners.second.first, corners.second.second);
+        // ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
+        // ROS_INFO("Corner 2: (%.2f, %.2f)", corners.second.first, corners.second.second);
 
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
