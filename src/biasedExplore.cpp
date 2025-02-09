@@ -1,9 +1,9 @@
 #include "biasedExplore.h"
 
-float sweepAngular = Deg2Rad(45.0);
+float sweepAngular = Deg2Rad(30.0);
 float sweepReturnAngularTolerance = 1.5;
 int minSweepPoints = 180;
-float stopBeforeWallDistance = 0.6;
+float stopBeforeWallDistance = 0.4;
 float distanceLimit = 4;
 
 void sweep360(std::vector<std::array<float, 2>> &sweptPoints, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
@@ -67,7 +67,7 @@ void findNextDestination(float posX, float posY, std::vector<std::array<float, 2
         thisSum = 0;
 
         for(int j = 0; j < visitedPoints.size(); j++){
-            thisSum += distanceBetween(visitedPoints[j][0], visitedPoints[j][1], sweptPoints[i][0], sweptPoints[i][1]);
+            thisSum += (float) pow(distanceBetween(visitedPoints[j][0], visitedPoints[j][1], sweptPoints[i][0], sweptPoints[i][1]), 0.7);
         }
 
         
@@ -86,7 +86,7 @@ void findNextDestination(float posX, float posY, std::vector<std::array<float, 2
     nextY = sweptPoints[selectedIndex][1];
     ROS_INFO("NextX/NextY before: %.2f/%.2f", nextX, nextY);
 
-    float nextDist = distanceBetween(posX, posY, nextX, nextY)*0.95 - stopBeforeWallDistance;
+    float nextDist = distanceBetween(posX, posY, nextX, nextY) - stopBeforeWallDistance;
     float nextYaw = Rad2Deg(atan2(nextY - posY, nextX - posX));
     
     // ROS_INFO("Distance of %.2f at index %d.", nextDist, selectedIndex);

@@ -16,7 +16,7 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
 
 void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     ROS_INFO("handleBumperPressed() called...");
-    float reverseDistance = 0.2;
+    float reverseDistance = 0.18;
     float forwardDistance = reverseDistance / std::cos(Deg2Rad(turnAngle)) * 0.9;
 
     float exitDistanceThreshold = 0.02;
@@ -49,11 +49,11 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
     // 2. Turn
     if(turnAngle == 0){ // If center bumper was pressed this is called
         if(distances.leftRay > distances.rightRay){
-            turnAngle = 45;
+            turnAngle = 60;
         }
 
         else{
-            turnAngle = -45;
+            turnAngle = -60;
         }
 
     }
@@ -61,6 +61,9 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
     rotateToHeading(yaw + turnAngle, vel, vel_pub);
 
     // 3. Drive Forward
+    if(bumpers.anyPressed){
+        return;
+    }
     ROS_INFO("handleBumperPressed() | Advancing...");
     x0 = posX;
     y0 = posY;
@@ -105,11 +108,11 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
 void checkBumper(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     if(bumpers.anyPressed){
         if(bumpers.leftPressed){
-            handleBumperPressed((float) -45.0, vel, vel_pub);
+            handleBumperPressed((float) -60, vel, vel_pub);
         }
 
         else if(bumpers.rightPressed){
-            handleBumperPressed((float) 45.0, vel, vel_pub);
+            handleBumperPressed((float) 60, vel, vel_pub);
         }
 
         else if(bumpers.centerPressed){

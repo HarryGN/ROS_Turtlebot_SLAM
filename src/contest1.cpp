@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     std::vector<std::array<float, 2>> visitedPoints;
     float nextX, nextY;
 
-    while(ros::ok() && secondsElapsed <= 480) {
+    while(ros::ok() && secondsElapsed <= 960) {
         ros::spinOnce();
 
         sweptPoints.clear();

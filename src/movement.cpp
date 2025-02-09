@@ -7,7 +7,7 @@ float minAngular = 15; // Degrees per second
 float maxAngular = 45; // Degrees per second
 
 float navigationTolerance = 0.1;
-float navigationBumperExitTolerance = 1;
+float navigationBumperExitTolerance = 0.5;
 float kp_n = 0.02;
 float kn_n = 0.5;
 float minLinear = 0.1;
@@ -141,7 +141,7 @@ void navigateToPosition(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::
         dy = tgtY-posY;
         d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
 
-        if(bumpers.anyPressed && (bumperHits > bumperHitsLimit || d < navigationBumperExitTolerance)){
+        if(bumpers.anyPressed && (bumperHits >= bumperHitsLimit || d < navigationBumperExitTolerance)){
             checkBumper(vel, vel_pub);
             return;
         }
