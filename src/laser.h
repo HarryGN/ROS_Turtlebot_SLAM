@@ -4,6 +4,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <cmath>
 #include <limits>
+#include "common.h"
 
 // Structures
 struct LaserScanData {

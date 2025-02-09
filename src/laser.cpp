@@ -3,12 +3,14 @@
 
 #define RAD2DEG(rad) ((rad) * 180. / M_PI)
 #define DEG2RAD(deg) ((deg) * M_PI / 180.)
+#define Rad2Deg(rad) ((rad) * 180. / M_PI)
+#define Deg2Rad(deg) ((deg) * M_PI / 180.)
 
 float full_angle = 57.0;
 DistancesStruct distances;
 
 void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist){
-    float angle = (float) ind / (float) nLasers * fullAngle + 90 - fullAngle/2;
+    float angle = (float) ind / (float) nLasers * full_angle + 90 - full_angle/2;
     horz_dist = std::abs(distance * std::cos(Deg2Rad(angle)));
     front_dist = std::abs(distance * std::sin(Deg2Rad(angle)));
 }
@@ -83,15 +85,15 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
 
     // 3c Front
     int j = 1;
-    bool odd = true;
+    bool odd1 = true;
     while(std::isnan(distances.frontRay)){
         distances.frontRay = msg->ranges[frontInd+j];
-        if(odd){
-            odd = false;
+        if(odd1){
+            odd1 = false;
             j = -(j);
         }
         else{
-            odd = true;
+            odd1 = true;
             j = -(j+1);
         }
     }
