@@ -24,3 +24,4 @@ include_directories(include ${OpenCV_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
 add_executable(contest1 src/contest1.cpp)
 target_link_libraries(contest1 ${catkin_LIBRARIES} ${OpenCV_LIB})
 
+add_executable(contest1 src/contest1.cpp src/updateCoordinate.cpp)
