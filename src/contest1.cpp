@@ -426,7 +426,6 @@ void rotateRobot(double angular_speed, double duration) {
     ROS_INFO("Rotation complete. Robot stopped.");
 }
 
-
 // Function to perform wall-following logic
 void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel, ros::Publisher &vel_pub) {
     
@@ -617,7 +616,7 @@ int main(int argc, char **argv) {
         ////////////////////////////////////////////////////////////////coordinate break check////////////////////////////////////////////////////
         // Check if the robot has returned to a previous position
         // Then start zig-zag. Need to incorporate
-        if (coordUpdater.is_position_visited(posX, posY)) {
+        if (is_position_visited(posX, posY)) {
             ROS_INFO("Robot has completed a round and returned to previous position.");
             
             //get_all_corners

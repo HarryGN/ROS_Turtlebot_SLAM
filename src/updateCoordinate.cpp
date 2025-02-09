@@ -1,6 +1,6 @@
 #include "updateCoordinate.h"
 
-void updateCoordinate::get_coord() {
+void get_coord() {
     bool is_visited = false;
     for (const auto& coord : positions) {
         if (std::abs(coord.first - posX) < 0.05 && std::abs(coord.second - posY) < 0.05) {
@@ -17,11 +17,11 @@ void updateCoordinate::get_coord() {
     }
 }
 
-double updateCoordinate::calculate_distance(const std::pair<double, double>& p1, const std::pair<double, double>& p2) {
+double calculate_distance(const std::pair<double, double>& p1, const std::pair<double, double>& p2) {
     return std::sqrt(std::pow(p2.first - p1.first, 2) + std::pow(p2.second - p1.second, 2));
 }
 
-std::pair<std::pair<double, double>, std::pair<double, double>> updateCoordinate::filter_corner() {
+std::pair<std::pair<double, double>, std::pair<double, double>> filter_corner() {
     double max_distance = 0.0;
     std::pair<double, double> corner1, corner2;
 
@@ -40,7 +40,7 @@ std::pair<std::pair<double, double>, std::pair<double, double>> updateCoordinate
     return std::make_pair(corner1, corner2);
 }
 
-double updateCoordinate::get_total_dist() {
+double get_total_dist() {
     double total_dist = 0.0;
 
     for (size_t i = 1; i < positions.size(); ++i) {
@@ -50,7 +50,7 @@ double updateCoordinate::get_total_dist() {
     return total_dist;
 }
 
-bool updateCoordinate::is_position_visited(double x, double y, double threshold, double min_distance) {
+bool is_position_visited(double x, double y, double threshold, double min_distance) {
     double total_dist = get_total_dist();
     ROS_INFO("Total distance = %f", total_dist);
     bool corner_set = false;
@@ -68,17 +68,17 @@ bool updateCoordinate::is_position_visited(double x, double y, double threshold,
     return false;
 }
 
-double updateCoordinate::point_to_line_distance(const std::pair<double, double>& point, const std::pair<double, double>& line_start, const std::pair<double, double>& line_end) {
+double point_to_line_distance(const std::pair<double, double>& point, const std::pair<double, double>& line_start, const std::pair<double, double>& line_end) {
     double normal_length = std::hypot(line_end.first - line_start.first, line_end.second - line_start.second);
     return std::abs((point.first - line_start.first) * (line_end.second - line_start.second) - (point.second - line_start.second) * (line_end.first - line_start.first)) / normal_length;
 }
 
-int updateCoordinate::line_side(const std::pair<double, double>& point, the std::pair<double, double>& line_start, the std::pair<double, double>& line_end) {
+int line_side(const std::pair<double, double>& point, the std::pair<double, double>& line_start, the std::pair<double, double>& line_end) {
     double result = (point.first - line_start.first) * (line_end.second - line_start.second) - (point.second - line_start.second) * (line_end.first - line_start.first);
     return (result > 0) ? 1 : (result < 0) ? -1 : 0;
 }
 
-std::vector<std::pair<double, double>> updateCoordinate::get_all_corners() {
+std::vector<std::pair<double, double>> get_all_corners() {
     std::vector<std::pair<double, double>> all_corners;
     std::pair<std::pair<double, double>, std::pair<double, double>> far_corners = filter_corner();
 
