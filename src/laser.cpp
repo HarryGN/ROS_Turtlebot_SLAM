@@ -8,6 +8,10 @@
 
 float full_angle = 57.0;
 DistancesStruct distances;
+int nLasers = 0;       // 激光雷达数据的数量
+int right_idx = 0;     // 右侧激光索引
+int front_idx = 0;     // 前方激光索引
+int left_idx = 0;      // 左侧激光索引
 
 void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist){
     float angle = (float) ind / (float) nLasers * full_angle + 90 - full_angle/2;
