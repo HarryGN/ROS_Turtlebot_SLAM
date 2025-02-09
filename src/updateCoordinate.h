@@ -18,7 +18,7 @@ double point_to_line_distance(const std::pair<double, double>& point, const std:
 int line_side(const std::pair<double, double>& point, const std::pair<double, double>& line_start, const std::pair<double, double>& line_end);
 std::vector<std::pair<double, double>> get_all_corners();
 
-std::vector<std::pair<double, double>> positions;
+extern std::vector<std::pair<double, double>> positions;
 
 
 #endif

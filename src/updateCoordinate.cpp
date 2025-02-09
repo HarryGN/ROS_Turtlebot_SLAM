@@ -73,7 +73,7 @@ double point_to_line_distance(const std::pair<double, double>& point, const std:
     return std::abs((point.first - line_start.first) * (line_end.second - line_start.second) - (point.second - line_start.second) * (line_end.first - line_start.first)) / normal_length;
 }
 
-int line_side(const std::pair<double, double>& point, the std::pair<double, double>& line_start, the std::pair<double, double>& line_end) {
+int line_side(const std::pair<double, double>& point, std::pair<double, double>& line_start, std::pair<double, double>& line_end) {
     double result = (point.first - line_start.first) * (line_end.second - line_start.second) - (point.second - line_start.second) * (line_end.first - line_start.first);
     return (result > 0) ? 1 : (result < 0) ? -1 : 0;
 }
