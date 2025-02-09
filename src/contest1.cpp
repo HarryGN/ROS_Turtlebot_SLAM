@@ -487,17 +487,17 @@ void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float lef
 int main(int argc, char **argv) {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
-
     ros::Subscriber bumper_sub = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
     ros::Subscriber laser_sub = nh.subscribe("scan", 10, &laserCallback);
     ros::Subscriber odom_sub = nh.subscribe("odom", 1, &odomCallback);
-
     vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
     ros::Rate loop_rate(10);
-
     geometry_msgs::Twist vel;
     auto start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
+
+    // coordinate headers
+    UpdateCoordinate coordUpdater;
 
     const float target_distance = 0.9;
     const float safe_threshold = 1.0;  // Safe distance threshold
@@ -519,8 +519,8 @@ int main(int argc, char **argv) {
     while (ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
 
-        UpdateCoordinate.get_coord();  //store positions
-        std::pair<std::pair<double, double>, std::pair<double, double>> corners = UpdateCoordinate.filter_corner();
+        coordUpdater.get_coord();  //store positions
+        std::pair<std::pair<double, double>, std::pair<double, double>> corners = coordUpdater.filter_corner();
         // Print corner coord
         ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
         ROS_INFO("Corner 2: (%.2f, %.2f)", corners.second.first, corners.second.second);
@@ -620,11 +620,11 @@ int main(int argc, char **argv) {
         ////////////////////////////////////////////////////////////////coordinate break check////////////////////////////////////////////////////
         // Check if the robot has returned to a previous position
         // Then start zig-zag. Need to incorporate
-        if (UpdateCoordinate.is_position_visited(posX, posY)) {
+        if (coordUpdater.is_position_visited(posX, posY)) {
             ROS_INFO("Robot has completed a round and returned to previous position.");
             
             //get_all_corners
-            std::vector<std::pair<double, double>> corners = UpdateCoordinate.get_all_corners();
+            std::vector<std::pair<double, double>> corners = coordUpdater.get_all_corners();
             
             // Printing out the corners for debugging or monitoring
             ROS_INFO("Detected Corners:");
