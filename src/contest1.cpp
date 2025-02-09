@@ -9,8 +9,6 @@
 #include <cmath>
 #include <limits>
 #include <chrono>
-
-//coordinates
 #include <algorithm>
 #include <numeric>
 #include "updateCoordinate.h"
