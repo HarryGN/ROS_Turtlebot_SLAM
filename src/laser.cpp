@@ -1,6 +1,9 @@
 #include "laser.h"
 #include <ros/ros.h>
 
+#define RAD2DEG(rad) ((rad) * 180. / M_PI)
+#define DEG2RAD(deg) ((deg) * M_PI / 180.)
+
 extern float full_angle; // If full_angle is used here, it should be declared as external in the main or another file.
 
 void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist) {
