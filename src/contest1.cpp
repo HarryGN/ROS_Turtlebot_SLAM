@@ -34,9 +34,10 @@ float angular = 0.0;
 float linear = 0.0;
 float minLaserDist = std::numeric_limits<float>::infinity();
 float left_distance = 0.0, right_distance = 0.0, front_distance = 0.0;
-float offset = 0.8;
 int32_t nLasers=0, desiredNLasers=0, desiredAngle=5;
 
+#pragma region Setup Coordinates
+float offset = 0.8;
 Point furthestPoint;  // store the coordinates of the furthest point
 double furthestDistance = 0;
 
@@ -45,8 +46,7 @@ std::vector<std::pair<double, double>> positions;
 
 // Vector to store laser scanned coordinates
 std::vector<Point> global_scan_points;
-
-// Vector to store 
+#pragma endregion
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
 {
@@ -62,6 +62,7 @@ void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
     ROS_INFO("(x,y):(%f,%f).", posX, posY);
 }
 
+#pragma region Get Coordinate
 void computeAdvanceCoordinate(float distance, float angle_rad, float posX, float posY, float &targetX, float &targetY){
     float dx = distance * std::cos(angle_rad);
     float dy = distance * std::sin(angle_rad);
@@ -130,6 +131,8 @@ Point get_offset_target(double posX, double posY, Point furthestPoint, float off
     target.y = furthestPoint.y - normalizedY * offset;
     target.angle = furthestPoint.angle; 
 
+    ROS_INFO("Target Point Q: Global (%2f,%2f), abs angle: %2f", target.x, target.y, RAD2DEG(target.angle));
+
     return target;
 }
 // Store the current coordinates in the position vector
@@ -156,8 +159,9 @@ void get_coord() {
     }
     */
 }
+#pragma endregion
 
-
+#pragma region Get Corners
 // find the corner coordinates with the largest distance between them
 std::pair<std::pair<double, double>, std::pair<double, double>> filter_corner() {
     double max_distance = 0.0;
@@ -212,7 +216,6 @@ bool is_position_visited(double x, double y, double threshold = 1.0, double min_
     }
     return false; // Position has not been visited
 }
-// ---------------------------------------------------------------------------------------------------------------------------------
 
 double point_to_line_distance(const std::pair<double, double>& point, const std::pair<double, double>& line_start, const std::pair<double, double>& line_end) {
     double normal_length = std::hypot(line_end.first - line_start.first, line_end.second - line_start.second);
@@ -255,7 +258,7 @@ std::vector<std::pair<double, double>> get_all_corners() {
 
     return all_corners;
 }
-
+#pragma endregion
 
 int main(int argc, char **argv)
 {
@@ -265,12 +268,8 @@ int main(int argc, char **argv)
     ros::Subscriber bumper_sub = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
     ros::Subscriber laser_sub = nh.subscribe("scan", 10, &laserCallback);
     ros::Subscriber odom = nh.subscribe("odom", 1, odomCallback); 
-
     ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
     ros::Rate loop_rate(10);
-
-    // // Create a timer to call store_coordinates every second 
-    // ros::Timer timer = nh.createTimer(ros::Duration(1.0), store_coordinates);
 
     geometry_msgs::Twist vel;
 
@@ -284,21 +283,14 @@ int main(int argc, char **argv)
 
     while(ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
-        // ROS_INFO("Postion: (%f, %f) Orientation: %f degrees Range: %f", posX, posY, yaw*180/pi, maxLaserRange);
-        // Check if any of the bumpers were pressed.
 
         get_coord();  //store positions
-        // std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
-        // Print corner coord
-        // ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
-        // ROS_INFO("Corner 2: (%.2f, %.2f)", corners.second.first, corners.second.second);
 
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
 
         Point furthestPoint = getFurthestPoint();
         Point targetPoint = get_offset_target(posX, posY, furthestPoint, offset);
-        ROS_INFO("Target Point Q: (%2f,%2f)", targetPoint.x, targetPoint.y);
 
 
 
