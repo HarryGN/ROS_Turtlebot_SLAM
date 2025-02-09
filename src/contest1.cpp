@@ -25,13 +25,6 @@
 #pragma region Bumper variable
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 
-struct BumpersStruct{
-    bool leftPressed;
-    bool centerPressed;
-    bool rightPressed;
-    bool anyPressed;
-};
-
 BumpersStruct bumpers;
 
 #pragma endregion
@@ -90,25 +83,6 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
 /// @param turnAngle 
 /// @param vel 
 /// @param vel_pub /
-void applyMagnitudeLimits(float &value, float lowerLimit, float upperLimit){
-    if(value < 0){
-        if(value < -upperLimit){
-            value = -upperLimit;
-        }
-        else if(value > -lowerLimit){
-            value = -lowerLimit;
-        }
-    }
-
-    else if(value > 0){
-        if(value > upperLimit){
-            value = upperLimit;
-        }
-        else if(value < lowerLimit){
-            value = lowerLimit;
-        }
-    }
-}
 
 float computeAngular(float targetHeading, float currentYaw){
     float angularDeg;
