@@ -34,6 +34,7 @@ float angular = 0.0;
 float linear = 0.0;
 float minLaserDist = std::numeric_limits<float>::infinity();
 float left_distance = 0.0, right_distance = 0.0, front_distance = 0.0;
+float offset = 0.0;
 int32_t nLasers=0, desiredNLasers=0, desiredAngle=5;
 
 Point furthestPoint;  // store the coordinates of the furthest point
@@ -113,21 +114,23 @@ const std::vector<Point>& getAllScanPoints(){
 }
 
 
-Point get_offset_target(Point currentPos, Point furthestPoint, float offset) {
+Point get_offset_target(posX, posY, Point furthestPoint, float offset = 1) {
     Point target;
 
-    float vectorX = furthestPoint.x - currentPos.x;
-    float vectorY = furthestPoint.y - currentPos.y;
+    float vectorX = furthestPoint.x - posX;
+    float vectorY = furthestPoint.y - posY;
 
-    double distance = calculate_distance({currentPos.x, currentPos.y}, {furthestPoint.x, furthestPoint.y});
+    double distance = calculate_distance({posX, posY}, {furthestPoint.x, furthestPoint.y});
 
     float normalizedX = vectorX / distance;
     float normalizedY = vectorY / distance;
 
     // offset from P
-    target.x = furthestPoint.x - normalizedX * offset;
+     = furthestPoint.x - normalizedX * offset;
     target.y = furthestPoint.y - normalizedY * offset;
     target.angle = furthestPoint.angle; 
+
+    ROS_INFO("Target offset Q (%f, %f)", target.x, target.y);
 
     return target;
 }
@@ -292,16 +295,13 @@ int main(int argc, char **argv)
         // ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
         // ROS_INFO("Corner 2: (%.2f, %.2f)", corners.second.first, corners.second.second);
 
-        Point furthestPoint = getFurthestPoint();
-
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
 
-        float offset = 1.0;  // 从最远点向当前位置移动的距离（米）
+        furthestPoint = getFurthestPoint();
+        targetPoint = get_offset_target(posX, posY, furthestPoint, offset);
 
-        Point targetPoint = get_offset_target(currentPosition, furthestPoint, offset);
-
-        std::cout << "Target Point Q: X = " << targetPoint.x << ", Y = " << targetPoint.y << std::endl;
+        // std::cout << "Target Point Q: X = " << targetPoint.x << ", Y = " << targetPoint.y << std::endl;
 
 
 
