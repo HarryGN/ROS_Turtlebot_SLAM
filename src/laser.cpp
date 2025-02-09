@@ -4,13 +4,13 @@
 #define RAD2DEG(rad) ((rad) * 180. / M_PI)
 #define DEG2RAD(deg) ((deg) * M_PI / 180.)
 
-extern float full_angle; // If full_angle is used here, it should be declared as external in the main or another file.
+float full_angle = 57.0;
+DistancesStruct distances;
 
-void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist) {
-    float angle = (float) ind / (float) nLasers * full_angle + 90 - full_angle / 2;
-    horz_dist = distance * std::cos(DEG2RAD(angle));
-    front_dist = distance * std::sin(DEG2RAD(angle));
-    front_dist += 0.05;
+void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist){
+    float angle = (float) ind / (float) nLasers * fullAngle + 90 - fullAngle/2;
+    horz_dist = std::abs(distance * std::cos(Deg2Rad(angle)));
+    front_dist = std::abs(distance * std::sin(Deg2Rad(angle)));
 }
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
@@ -22,12 +22,51 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     laser_data.front_distance = msg->ranges[front_idx];
     laser_data.right_distance = msg->ranges[right_idx];
 
+    // 1. Update previous values
+    distances.leftRayPrev = distances.leftRay;
+    distances.leftHorzPrev = distances.leftHorz;
+    distances.leftVertPrev = distances.leftVert;
+    distances.frontRayPrev = distances.frontRay;
+    distances.rightRayPrev = distances.rightRay;
+    distances.rightHorzPrev = distances.rightHorz;
+    distances.rightVertPrev = distances.rightVert;
+    distances.minPrev = distances.min;
+    // 2. Get the indices for first, middle, and last readings
+    uint16_t  rightInd = 0;               // First reading (right)
+    uint16_t  frontInd = nLasers / 2;     // Middle reading (front)
+    uint16_t  leftInd = nLasers - 1;      // Last reading (left)
+    // 3. Find the closes non-nan value for right, front, and left
+    distances.leftRay= msg->ranges[leftInd];
+    distances.frontRay= msg->ranges[frontInd];
+    distances.rightRay = msg->ranges[rightInd];
+
     while(std::isnan(laser_data.left_distance) && left_idx > 0) {
         laser_data.left_distance = msg->ranges[--left_idx];
     }
 
     while(std::isnan(laser_data.right_distance) && right_idx < nLasers - 1) {
         laser_data.right_distance = msg->ranges[++right_idx];
+    }
+
+    // 3a Left
+    while(std::isnan(distances.leftRay)){
+        distances.leftRay = msg->ranges[leftInd];
+        leftInd--;
+
+        if(leftInd < frontInd){
+            distances.leftRay = 0.25;
+            break;
+        }
+    }
+    // 3b Right
+    while(std::isnan(distances.rightRay)){
+        distances.rightRay = msg->ranges[rightInd];
+        rightInd++;
+
+        if(rightInd > frontInd){
+            distances.rightRay=0.25;
+            break;
+        }
     }
 
     int i = 1;
@@ -41,6 +80,30 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
         }
         odd = !odd;
     }
+
+    // 3c Front
+    int j = 1;
+    bool odd = true;
+    while(std::isnan(distances.frontRay)){
+        distances.frontRay = msg->ranges[frontInd+j];
+        if(odd){
+            odd = false;
+            j = -(j);
+        }
+        else{
+            odd = true;
+            j = -(j+1);
+        }
+    }
+    frontInd += j;
+
+    // 4. Calculate Orthogonal (Horz/Vert) for Left and Right
+    // 4a Left
+    orthogonalizeRay(leftInd, nLasers, distances.leftRay, distances.leftHorz, distances.leftVert);
+    // 4b Right
+    orthogonalizeRay(rightInd, nLasers, distances.rightRay, distances.rightHorz, distances.rightVert);
+    // 5. Calculate min Distance
+    distances.min = std::min(std::min(distances.rightRay, distances.frontRay), distances.leftRay);
 
     ROS_INFO("Left: %.2f m, Front: %.2f m, Right: %.2f m, Min: %.2f m",
              laser_data.left_distance, laser_data.front_distance,

@@ -56,7 +56,6 @@ bool prev_turn = false;
 bool curr_turn = false;
 LaserScanData laser_data;
 OrthogonalDist orthogonal_dist;
-float full_angle = 57;
 int nLasers = 0;       // 激光雷达数据的数量
 int right_idx = 0;     // 右侧激光索引
 int front_idx = 0;     // 前方激光索引
