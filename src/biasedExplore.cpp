@@ -59,6 +59,9 @@ void findNextDestination(float posX, float posY, std::vector<std::array<float, 2
     float maxSum = 0;
     float thisSum;
 
+    float weightedK = 0.1;
+    float jCoefficient;
+
     std::array<float,2> currentPosition = {posX, posY};
     visitedPoints.push_back(currentPosition);
 
@@ -67,7 +70,8 @@ void findNextDestination(float posX, float posY, std::vector<std::array<float, 2
         thisSum = 0;
 
         for(int j = 0; j < visitedPoints.size(); j++){
-            thisSum += (float) pow(distanceBetween(visitedPoints[j][0], visitedPoints[j][1], sweptPoints[i][0], sweptPoints[i][1]), 0.7);
+            jCoefficient = exp(weightedK * j);
+            thisSum += jCoefficient * (float) pow(distanceBetween(visitedPoints[j][0], visitedPoints[j][1], sweptPoints[i][0], sweptPoints[i][1]), 0.5);
         }
 
         
