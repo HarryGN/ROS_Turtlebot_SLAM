@@ -99,9 +99,9 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
             }
         }
     }
-    if (furthestDistance > 0){
-        ROS_INFO("Furthest Point: Global (%2f, %2f), abs angle: %2f", furthestPoint.x, furthestPoint.y, RAD2DEG(furthestPoint.angle));
-    }
+    // if (furthestDistance > 0){
+    //     ROS_INFO("Furthest Point: Global (%2f, %2f), abs angle: %2f", furthestPoint.x, furthestPoint.y, RAD2DEG(furthestPoint.angle));
+    // }
 }
 
 Point getFurthestPoint(){
@@ -112,6 +112,25 @@ const std::vector<Point>& getAllScanPoints(){
     return global_scan_points;
 }
 
+
+Point get_offset_target(Point currentPos, Point furthestPoint, float offset) {
+    Point target;
+
+    float vectorX = furthestPoint.x - currentPos.x;
+    float vectorY = furthestPoint.y - currentPos.y;
+
+    double distance = calculate_distance({currentPos.x, currentPos.y}, {furthestPoint.x, furthestPoint.y});
+
+    float normalizedX = vectorX / distance;
+    float normalizedY = vectorY / distance;
+
+    // offset from P
+    target.x = furthestPoint.x - normalizedX * offset;
+    target.y = furthestPoint.y - normalizedY * offset;
+    target.angle = furthestPoint.angle; 
+
+    return target;
+}
 // Store the current coordinates in the position vector
 void get_coord() {
     bool is_visited = false;
@@ -268,13 +287,22 @@ int main(int argc, char **argv)
         // Check if any of the bumpers were pressed.
 
         get_coord();  //store positions
-        std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
+        // std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
         // Print corner coord
         // ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
         // ROS_INFO("Corner 2: (%.2f, %.2f)", corners.second.first, corners.second.second);
 
+        Point furthestPoint = getFurthestPoint();
+
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
+
+        float offset = 1.0;  // 从最远点向当前位置移动的距离（米）
+
+        Point targetPoint = get_offset_target(currentPosition, furthestPoint, offset);
+
+        std::cout << "Target Point Q: X = " << targetPoint.x << ", Y = " << targetPoint.y << std::endl;
+
 
 
         /*
