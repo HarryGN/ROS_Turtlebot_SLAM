@@ -1,3 +1,6 @@
+#ifndef updateCoordinateHeader
+#define updateCoordinateHeader 
+
 #pragma once
 
 #include <vector>
@@ -12,7 +15,7 @@ struct Position {
     double x, y;
 };
 
-class UpdateCoordinate {
+class updateCoordinate {
 public:
     void get_coord();
     double calculate_distance(const std::pair<double, double>& p1, const std::pair<double, double>& p2);
@@ -25,3 +28,5 @@ public:
 private:
     std::vector<std::pair<double, double>> positions;
 };
+
+#endif

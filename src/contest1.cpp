@@ -13,7 +13,7 @@
 //coordinates
 #include <algorithm>
 #include <numeric>
-#include "UpdateCoordinate.h"
+#include "updateCoordinate.h"
 
 #define N_BUMPER (3)
 #define RAD2DEG(rad) ((rad) * 180. / M_PI)
@@ -496,9 +496,6 @@ int main(int argc, char **argv) {
     auto start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
 
-    // coordinate headers
-    UpdateCoordinate coordUpdater;
-
     const float target_distance = 0.9;
     const float safe_threshold = 1.0;  // Safe distance threshold
     const double k = 0.18;   // Scaling factor for angular velocity
@@ -519,8 +516,8 @@ int main(int argc, char **argv) {
     while (ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
 
-        coordUpdater.get_coord();  //store positions
-        std::pair<std::pair<double, double>, std::pair<double, double>> corners = coordUpdater.filter_corner();
+        get_coord();  //store positions
+        std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
         // Print corner coord
         ROS_INFO("Corner 1: (%.2f, %.2f)", corners.first.first, corners.first.second); 
         ROS_INFO("Corner 2: (%.2f, %.2f)", corners.second.first, corners.second.second);
@@ -624,7 +621,7 @@ int main(int argc, char **argv) {
             ROS_INFO("Robot has completed a round and returned to previous position.");
             
             //get_all_corners
-            std::vector<std::pair<double, double>> corners = coordUpdater.get_all_corners();
+            std::vector<std::pair<double, double>> corners = get_all_corners();
             
             // Printing out the corners for debugging or monitoring
             ROS_INFO("Detected Corners:");
