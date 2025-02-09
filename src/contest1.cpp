@@ -34,7 +34,7 @@ float angular = 0.0;
 float linear = 0.0;
 float minLaserDist = std::numeric_limits<float>::infinity();
 float left_distance = 0.0, right_distance = 0.0, front_distance = 0.0;
-float offset = 0.0;
+float offset = 0.8;
 int32_t nLasers=0, desiredNLasers=0, desiredAngle=5;
 
 Point furthestPoint;  // store the coordinates of the furthest point
@@ -89,7 +89,7 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
             // Calculate global position
             computeAdvanceCoordinate(distance, angle + yaw, posX, posY, targetX, targetY);
             global_scan_points.push_back({targetX, targetY, (angle + yaw)});   // store absolute angle
-            ROS_INFO(" Global X: %.2f, Y: %.2f", targetX, targetY);
+            // ROS_INFO(" Global X: %.2f, Y: %.2f", targetX, targetY);
 
             // Check if this point is furthest
             if (distance > furthestDistance) {
@@ -100,9 +100,9 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
             }
         }
     }
-    // if (furthestDistance > 0){
-    //     ROS_INFO("Furthest Point: Global (%2f, %2f), abs angle: %2f", furthestPoint.x, furthestPoint.y, RAD2DEG(furthestPoint.angle));
-    // }
+    if (furthestDistance > 0){
+        ROS_INFO("Furthest Point P: Global (%2f, %2f), abs angle: %2f", furthestPoint.x, furthestPoint.y, RAD2DEG(furthestPoint.angle));
+    }
 }
 
 Point getFurthestPoint(){
@@ -114,7 +114,7 @@ const std::vector<Point>& getAllScanPoints(){
 }
 
 
-Point get_offset_target(posX, posY, Point furthestPoint, float offset = 1) {
+Point get_offset_target(double posX, double posY, Point furthestPoint, float offset) {
     Point target;
 
     float vectorX = furthestPoint.x - posX;
@@ -126,11 +126,9 @@ Point get_offset_target(posX, posY, Point furthestPoint, float offset = 1) {
     float normalizedY = vectorY / distance;
 
     // offset from P
-     = furthestPoint.x - normalizedX * offset;
+    target.x = furthestPoint.x - normalizedX * offset;
     target.y = furthestPoint.y - normalizedY * offset;
     target.angle = furthestPoint.angle; 
-
-    ROS_INFO("Target offset Q (%f, %f)", target.x, target.y);
 
     return target;
 }
@@ -298,10 +296,9 @@ int main(int argc, char **argv)
         bool any_bumper_pressed = false;
         float target_distance = 0.9;
 
-        furthestPoint = getFurthestPoint();
-        targetPoint = get_offset_target(posX, posY, furthestPoint, offset);
-
-        // std::cout << "Target Point Q: X = " << targetPoint.x << ", Y = " << targetPoint.y << std::endl;
+        Point furthestPoint = getFurthestPoint();
+        Point targetPoint = get_offset_target(posX, posY, furthestPoint, offset);
+        ROS_INFO("Target Point Q: (%2f,%2f)", targetPoint.x, targetPoint.y);
 
 
 
