@@ -143,21 +143,21 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
 
 }
 
-void checkBumper(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
-    if(bumpers.anyPressed){
-        if(bumpers.leftPressed){
-            handleBumperPressed((float) -60, vel, vel_pub);
-        }
+// void checkBumper(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+//     if(bumpers.anyPressed){
+//         if(bumpers.leftPressed){
+//             handleBumperPressed((float) -60, vel, vel_pub);
+//         }
 
-        else if(bumpers.rightPressed){
-            handleBumperPressed((float) 60, vel, vel_pub);
-        }
+//         else if(bumpers.rightPressed){
+//             handleBumperPressed((float) 60, vel, vel_pub);
+//         }
 
-        else if(bumpers.centerPressed){
-            handleBumperPressed((float) 0.0, vel, vel_pub);
-        }
-    }
-}    
+//         else if(bumpers.centerPressed){
+//             handleBumperPressed((float) 0.0, vel, vel_pub);
+//         }
+//     }
+// }    
 
 
 void checkBumper(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
