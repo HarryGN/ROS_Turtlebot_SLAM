@@ -1,7 +1,15 @@
+BUMPER.cpp
+
 #include "bumper.h"
 
+// Existing global variables for bumper state
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 BumpersStruct bumpers;
+
+// Make sure to include these headers
+#include <visualization_msgs/Marker.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <tf/transform_datatypes.h>
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     bumper[msg->bumper] = msg->state;
@@ -12,7 +20,43 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     bumpers.anyPressed = bumpers.leftPressed || bumpers.centerPressed || bumpers.rightPressed;
 
     ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", bumpers.leftPressed, bumpers.centerPressed, bumpers.rightPressed);
+
+    if(bumpers.anyPressed){
+        // Publish a PoseStamped with the current position and orientation.
+        geometry_msgs::PoseStamped pose;
+        pose.header.stamp = ros::Time::now();
+        pose.header.frame_id = "map";
+        pose.pose.position.x = posX;
+        pose.pose.position.y = posY;
+        pose.pose.position.z = 0.0;
+        pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
+        pose_pub.publish(pose);
+
+        // Create and publish a SPHERE marker (yellow, circular, and larger)
+        static int marker_id = 0;
+        visualization_msgs::Marker marker;
+        marker.header.stamp = ros::Time::now();
+        marker.header.frame_id = "map";
+        marker.ns = "bumper_markers";
+        marker.id = marker_id++;
+        marker.type = visualization_msgs::Marker::SPHERE;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.pose.position.x = posX;
+        marker.pose.position.y = posY;
+        marker.pose.position.z = 0.0;
+        marker.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
+        marker.scale.x = 0.3;
+        marker.scale.y = 0.3;
+        marker.scale.z = 0.3;
+        marker.color.a = 1.0;
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+        marker_pub.publish(marker);
+    }
 }
+
+
 
 void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     ROS_INFO("handleBumperPressed() called...");
@@ -92,7 +136,6 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
     rotateToHeading(yaw - turnAngle, vel, vel_pub);
 
 
-
     ROS_INFO("handleBumperPressed() | END");
     linear = 0;
     angular = 0;
@@ -105,19 +148,33 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
 
 }
 
+// void checkBumper(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+//     if(bumpers.anyPressed){
+//         if(bumpers.leftPressed){
+//             handleBumperPressed((float) -60, vel, vel_pub);
+//         }
+
+//         else if(bumpers.rightPressed){
+//             handleBumperPressed((float) 60, vel, vel_pub);
+//         }
+
+//         else if(bumpers.centerPressed){
+//             handleBumperPressed((float) 0.0, vel, vel_pub);
+//         }
+//     }
+// }    
+
+
 void checkBumper(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     if(bumpers.anyPressed){
-        if(bumpers.leftPressed){
-            handleBumperPressed((float) -60, vel, vel_pub);
+        if(bumper[kobuki_msgs::BumperEvent::LEFT]){
+            handleBumperPressed(-60.0f, vel, vel_pub);
         }
-
-        else if(bumpers.rightPressed){
-            handleBumperPressed((float) 60, vel, vel_pub);
+        else if(bumper[kobuki_msgs::BumperEvent::RIGHT]){
+            handleBumperPressed(60.0f, vel, vel_pub);
         }
-
-        else if(bumpers.centerPressed){
-            handleBumperPressed((float) 0.0, vel, vel_pub);
+        else if(bumper[kobuki_msgs::BumperEvent::CENTER]){
+            handleBumperPressed(0.0f, vel, vel_pub);
         }
     }
-}     
-
+}
