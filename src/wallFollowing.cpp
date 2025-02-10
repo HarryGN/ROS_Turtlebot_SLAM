@@ -222,14 +222,14 @@ void wallFollowing(WallSide wall_side, DistancesStruct distances, bool curr_turn
     else if (front_dist < 0.9 & left_dist < 0.9 & right_dist > 0.9  & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("Turn to the right");
-        rotateRobot(-0.25, 6.28, vel, vel_pub);
+        rotateRobot(-0.18, 6.28, vel, vel_pub);
         rotateRobot(0, 0, vel, vel_pub);
         curr_turn = true;
     }
     else if (front_dist < 0.9 & left_dist > 0.9 & right_dist < 0.9 & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("Turn to the left");
-        rotateRobot(0.25, 6.28, vel, vel_pub);
+        rotateRobot(0.18, 6.28, vel, vel_pub);
         rotateRobot(0, 0, vel, vel_pub);
         curr_turn = true;
     }

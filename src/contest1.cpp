@@ -62,8 +62,8 @@ int main(int argc, char **argv)
     #pragma region wallFollowing Param
     const float target_distance = 0.9;
     const float safe_threshold = 1.0;  // Safe distance threshold
-    const double k = 0.15;   // Scaling factor for angular velocity
-    const double alpha = 1.4; // Exponential growth/decay rate
+    const double k = 0.16;   // Scaling factor for angular velocity
+    const double alpha = 1.5; // Exponential growth/decay rate
     const float max_speed = 0.25;  // Max linear speed
     const float min_speed = 0.1;   // Min linear speed
     float current_x;
