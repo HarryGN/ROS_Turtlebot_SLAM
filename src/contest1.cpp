@@ -170,8 +170,7 @@ int main(int argc, char **argv)
                 
                     WallSide wall_side = LEFT; // Change to RIGHT to follow the right wall
                   
-                    wallFollowing(wall_side, distances, curr_turn, prev_turn, left_dist, right_dist, front_dist,
-                    target_distance, min_speed, k, alpha, geometry_msgs::Twist &vel, ros::Publisher &vel_pub);
+                    wallFollowing(wall_side, distances, curr_turn, prev_turn, left_dist, right_dist, front_dist, target_distance, min_speed, k, alpha, vel, vel_pub);
                 }
 
 

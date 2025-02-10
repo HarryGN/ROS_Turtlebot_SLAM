@@ -68,13 +68,13 @@ double get_total_dist() {
 // Need to tune the threshold -----------------------------------------------------------------------------------------------------
 bool is_position_visited(double x, double y, double threshold, double min_distance) {
     double total_dist = get_total_dist();
-    ROS_INFO("Total distance = %f", total_dist);
+    // ROS_INFO("Total distance = %f", total_dist);
     bool corner_set = false;
 
     // corner coordinates set when travel distance >= min_distance
     if (total_dist > min_distance) {
         corner_set = true;
-        ROS_INFO("Corner_set Flag = TRUE"); 
+        // ROS_INFO("Corner_set Flag = TRUE"); 
 
         // Read the corner coordinates
         std::pair<std::pair<double, double>, std::pair<double, double>> corners = filter_corner();
@@ -174,9 +174,9 @@ void rotateRobot(double angular_speed, double duration, geometry_msgs::Twist &ve
 
 void wallFollowing(WallSide wall_side, DistancesStruct distances, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel, ros::Publisher &vel_pub) {
     float safe_threshold = 0.5;
-    float target_distance = 0.9;
+
     float max_speed = 0.25;
-    float min_speed = 0.1;
+
     // Update linear speed based on wall distances
     if (distances.min >= safe_threshold) {
         vel.linear.x = max_speed;
