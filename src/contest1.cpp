@@ -34,7 +34,18 @@ int main(int argc, char **argv)
     std::vector<std::array<float, 2>> visitedPoints;
     float nextX, nextY;
 
-    while(ros::ok() && secondsElapsed <= 960) {
+    // wallFollowing
+    while(ros::ok() && secondsElapsed <= 180) {
+        ros::spinOnce();
+
+        secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
+        loop_rate.sleep();
+    }
+
+    
+
+    // biasedExplore
+    while(ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
 
         sweptPoints.clear();
