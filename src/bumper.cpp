@@ -20,7 +20,7 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", bumpers.leftPressed, bumpers.centerPressed, bumpers.rightPressed);
 
     if(bumpers.anyPressed){
-        // Publish a PoseStamped message with the current position and orientation
+        // Publish a PoseStamped with the current position and orientation.
         geometry_msgs::PoseStamped pose;
         pose.header.stamp = ros::Time::now();
         pose.header.frame_id = "map";
@@ -30,14 +30,14 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
         pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
         pose_pub.publish(pose);
 
-        // Create and publish a CYLINDER marker (appearing as a flat yellow circle)
+        // Create and publish a SPHERE marker (yellow, circular, and larger)
         static int marker_id = 0;
         visualization_msgs::Marker marker;
         marker.header.stamp = ros::Time::now();
         marker.header.frame_id = "map";
         marker.ns = "bumper_markers";
         marker.id = marker_id++;
-        marker.type = visualization_msgs::Marker::CYLINDER;
+        marker.type = visualization_msgs::Marker::SPHERE;
         marker.action = visualization_msgs::Marker::ADD;
         marker.pose.position.x = posX;
         marker.pose.position.y = posY;
@@ -45,7 +45,7 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
         marker.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
         marker.scale.x = 0.3;
         marker.scale.y = 0.3;
-        marker.scale.z = 0.05;
+        marker.scale.z = 0.3;
         marker.color.a = 1.0;
         marker.color.r = 1.0;
         marker.color.g = 1.0;
@@ -53,6 +53,7 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
         marker_pub.publish(marker);
     }
 }
+
 
 
 void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
