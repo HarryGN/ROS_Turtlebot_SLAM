@@ -1,9 +1,14 @@
 #include "bumper_1.h"
 
+<<<<<<< HEAD
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     bumper[msg->bumper] = msg->state;
+=======
+void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
+    // bumper[msg->bumper] = msg->state;
+>>>>>>> 768b77a
     bumpers.leftPressed = bumper[kobuki_msgs::BumperEvent::LEFT];
     bumpers.centerPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
     bumpers.rightPressed = bumper[kobuki_msgs::BumperEvent::RIGHT];
@@ -201,4 +206,7 @@ void bumper_handling (geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
         }
         }
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 768b77a

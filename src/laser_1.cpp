@@ -1,10 +1,13 @@
 #include "laser_1.h"
 
+<<<<<<< HEAD
 float full_angle = 57;
 int nLasers = 0;       // 激光雷达数据的数量
 int right_idx = 0;     // 右侧激光索引
 int front_idx = 0;     // 前方激光索引
 int left_idx = 0;      // 左侧激光索引
+=======
+>>>>>>> 768b77a
 
 void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, float &front_dist) {
     float angle = (float) ind / (float) nLasers * full_angle + 90 - full_angle / 2;
@@ -13,7 +16,10 @@ void orthogonalizeRay(int ind, int nLasers, float distance, float &horz_dist, fl
     front_dist += 0.05;
 }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 768b77a
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     nLasers = static_cast<int>((msg->angle_max - msg->angle_min) / msg->angle_increment);
     // 更新全局变量的值
@@ -94,5 +100,8 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
              laser_data.left_distance, laser_data.front_distance,
              laser_data.right_distance, laser_data.min_distance);
 }
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 768b77a

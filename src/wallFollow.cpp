@@ -1,8 +1,16 @@
 #include "wallFollow.h"
 
+<<<<<<< HEAD
 
 // Function to move the robot with a given linear and angular velocity
 void moveRobot(double linear_x, double angular_z, ros::Publisher &vel_pub) {
+=======
+// Define an enumeration for wall side
+// enum WallSide { LEFT, RIGHT };
+
+// Function to move the robot with a given linear and angular velocity
+void moveRobot(double linear_x, double angular_z) {
+>>>>>>> 768b77a
     geometry_msgs::Twist vel_msg;
 
     // Set the linear and angular velocity
@@ -15,7 +23,11 @@ void moveRobot(double linear_x, double angular_z, ros::Publisher &vel_pub) {
 }
 
 // Function to rotate the robot locally
+<<<<<<< HEAD
 void rotateRobot(double angular_speed, double duration, ros::Publisher &vel_pub) {
+=======
+void rotateRobot(double angular_speed, double duration) {
+>>>>>>> 768b77a
     geometry_msgs::Twist vel_msg;
 
     // Set linear velocity to 0 (no forward/backward movement)
@@ -41,6 +53,10 @@ void rotateRobot(double angular_speed, double duration, ros::Publisher &vel_pub)
     ROS_INFO("Rotation complete. Robot stopped.");
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 768b77a
 // Function to perform wall-following logic
 void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel, ros::Publisher &vel_pub) {
     
@@ -72,23 +88,38 @@ void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float lef
     else if (front_dist < 0.9 & left_dist < 0.9 & right_dist < 0.9 & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("surrounded by three walls");
+<<<<<<< HEAD
         rotateRobot(-0.25, 12.56, vel_pub);
         rotateRobot(0, 0, vel_pub);
+=======
+        rotateRobot(-0.25, 12.56);
+        rotateRobot(0, 0);
+>>>>>>> 768b77a
         curr_turn = true;
         
     }
     else if (front_dist < 0.9 & left_dist < 0.9 & right_dist > 0.9  & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("Turn to the right");
+<<<<<<< HEAD
         rotateRobot(-0.25, 6.28, vel_pub);
         rotateRobot(0, 0, vel_pub);
+=======
+        rotateRobot(-0.25, 6.28);
+        rotateRobot(0, 0);
+>>>>>>> 768b77a
         curr_turn = true;
     }
     else if (front_dist < 0.9 & left_dist > 0.9 & right_dist < 0.9 & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("Turn to the left");
+<<<<<<< HEAD
         rotateRobot(0.25, 6.28, vel_pub);
         rotateRobot(0, 0, vel_pub);
+=======
+        rotateRobot(0.25, 6.28);
+        rotateRobot(0, 0);
+>>>>>>> 768b77a
         curr_turn = true;
     }
     else {

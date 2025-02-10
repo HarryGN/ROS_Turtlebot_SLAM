@@ -1,5 +1,6 @@
 // Defined
 #include "coord.h"
+<<<<<<< HEAD
 #include "wallFollow.h"
 #include "bumper_1.h"
 #include "laser_1.h"
@@ -16,23 +17,27 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
     // //ROS_INFO("(x,y):(%f,%f) Orint: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
     // ROS_INFO("(x,y):(%f,%f).", posX, posY);
 }
+=======
+#include "common_1.h"
+#include "bumper_1.h"
+#include "laser_1.h"
+#include "wallFollow.h"
+>>>>>>> 768b77a
 
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
-
     ros::Subscriber bumper_sub = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
     ros::Subscriber laser_sub = nh.subscribe("scan", 10, &laserCallback);
     ros::Subscriber odom_sub = nh.subscribe("odom", 1, &odomCallback);
-
     vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
     ros::Rate loop_rate(10);
-
     geometry_msgs::Twist vel;
     auto start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
 
+<<<<<<< HEAD
     // 全局变量：存储上一帧的左/右激光读数
     float prev_left_distance = 0.0, prev_right_distance = 0.0;
     float prev_left_idx = 0.0, prev_right_idx = 0.0;
@@ -40,6 +45,8 @@ int main(int argc, char **argv) {
     int left_idx = 0;
     int right_idx = 0;
 
+=======
+>>>>>>> 768b77a
     while (ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
 
