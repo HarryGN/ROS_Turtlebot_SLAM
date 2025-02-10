@@ -28,7 +28,7 @@ void moveRobot(double linear_x, double angular_z, geometry_msgs::Twist &vel_msg,
 
 void rotateRobot(double angular_speed, double duration, geometry_msgs::Twist &vel_msg, ros::Publisher &vel_pub);
 
-void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel, ros::Publisher &vel_pub);
+void wallFollowing(WallSide wall_side, DistancesStruct distances, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel, ros::Publisher &vel_pub);
 
 void bumper_handling (geometry_msgs::Twist &vel, ros::Publisher &vel_pub);
 

@@ -172,7 +172,19 @@ void rotateRobot(double angular_speed, double duration, geometry_msgs::Twist &ve
     ROS_INFO("Rotation complete. Robot stopped.");
 }
 
-void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel, ros::Publisher &vel_pub) {
+void wallFollowing(WallSide wall_side, DistancesStruct distances, bool curr_turn, bool prev_turn, float left_dist, float right_dist, float front_dist, float target_distance, float min_speed, float k, float alpha, geometry_msgs::Twist &vel, ros::Publisher &vel_pub) {
+    float safe_threshold = 0.5;
+    float target_distance = 0.9;
+    float max_speed = 0.25;
+    float min_speed = 0.1;
+    // Update linear speed based on wall distances
+    if (distances.min >= safe_threshold) {
+        vel.linear.x = max_speed;
+    }
+    else {
+        vel.linear.x = min_speed + (max_speed - min_speed) * ((distances.min - target_distance) / (safe_threshold - target_distance));
+        vel.linear.x = std::max(static_cast<double>(min_speed), std::min(static_cast<double>(max_speed), vel.linear.x));
+    }
     
     bumper_handling(vel, vel_pub);
     // **Wall-Following Logic**
@@ -199,7 +211,7 @@ void wallFollowing(WallSide wall_side, bool curr_turn, bool prev_turn, float lef
         }
     } 
 
-    else if (front_dist < 0.9 & left_dist < 0.9 & right_dist < 0.9 & curr_turn != prev_turn) {
+    else if (front_dist < 0.9 & left_dist < 0.9 & right_dist < 0.9 ) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("surrounded by three walls");
         rotateRobot(-0.25, 12.56, vel, vel_pub);

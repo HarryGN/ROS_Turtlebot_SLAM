@@ -1,10 +1,10 @@
 #include "movement.h"
 
 float rotationTolerance = Deg2Rad(5);
-float kp_r = 2;
+float kp_r = 4;
 float kn_r = 0.7;
-float minAngular = 15; // Degrees per second
-float maxAngular = 45; // Degrees per second
+float minAngular = 30; // Degrees per second
+float maxAngular = 50; // Degrees per second
 
 float navigationTolerance = 0.1;
 float navigationBumperExitTolerance = 0.5;
