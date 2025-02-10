@@ -1,28 +1,9 @@
 // Defined
 #include "coord.h"
-<<<<<<< HEAD
-#include "wallFollow.h"
-#include "bumper_1.h"
-#include "laser_1.h"
-#include "common.h"
-
-std::vector<std::pair<double, double>> positions;
-
-ros::Publisher vel_pub;
-
-void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
-    posX = msg->pose.pose.position.x;
-    posY = msg->pose.pose.position.y;
-    yaw = RAD2DEG(tf::getYaw(msg->pose.pose.orientation));
-    // //ROS_INFO("(x,y):(%f,%f) Orint: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
-    // ROS_INFO("(x,y):(%f,%f).", posX, posY);
-}
-=======
 #include "common_1.h"
 #include "bumper_1.h"
 #include "laser_1.h"
 #include "wallFollow.h"
->>>>>>> 768b77a
 
 
 int main(int argc, char **argv) {
@@ -37,16 +18,6 @@ int main(int argc, char **argv) {
     auto start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
 
-<<<<<<< HEAD
-    // 全局变量：存储上一帧的左/右激光读数
-    float prev_left_distance = 0.0, prev_right_distance = 0.0;
-    float prev_left_idx = 0.0, prev_right_idx = 0.0;
-    int nLasers = 0; 
-    int left_idx = 0;
-    int right_idx = 0;
-
-=======
->>>>>>> 768b77a
     while (ros::ok() && secondsElapsed <= 480) {
         ros::spinOnce();
 
