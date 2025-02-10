@@ -21,6 +21,11 @@
 #include <vector>
 #include <array>
 
+#include <unordered_map>
+#include <algorithm>
+#include <numeric>
+#include <limits>
+
 #define Rad2Deg(rad) ((rad) * 180. / M_PI)
 #define Deg2Rad(deg) ((deg) * M_PI / 180.)
 
@@ -64,6 +69,7 @@ struct DistancesStruct{
 };
 
 extern DistancesStruct distances;
+extern uint16_t nLasers;
 
 #pragma endregion
 
@@ -74,6 +80,13 @@ extern float linear;
 extern float posX, posY, yaw;
 
 #pragma endregion
+
+#pragma region wallFollowing
+
+extern std::vector<std::pair<double, double>> positions;
+
+#pragma endregion
+
 
 #pragma region Functions
 
