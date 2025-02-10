@@ -302,6 +302,9 @@ void handleBumperPressed2(float turnAngle, geometry_msgs::Twist &vel, ros::Publi
     ROS_INFO("%.2f", d-forwardDistance);
     while((d-forwardDistance) < exitDistanceThreshold){
         ros::spinOnce();
+        if(bumpers.anyPressed){
+            return;
+        }
 
         linear = 0.1;
         angular = 0;
@@ -319,7 +322,7 @@ void handleBumperPressed2(float turnAngle, geometry_msgs::Twist &vel, ros::Publi
 
     // 4. Turn Back
     ROS_INFO("handleBumperPressed2() | Correcting yaw...");
-    rotateToHeading(yaw - turnAngle * 0.7, vel, vel_pub);
+    rotateToHeading(yaw - turnAngle * 0.5, vel, vel_pub);
 
 
 

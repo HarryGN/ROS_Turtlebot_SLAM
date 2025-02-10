@@ -71,7 +71,8 @@ int main(int argc, char **argv)
 
     #pragma endregion
     // wallFollowing
-    while(ros::ok() && secondsElapsed <= 180) {
+    bool wallFollowingLoop = true;
+    while(ros::ok() && secondsElapsed <= 300 && wallFollowingLoop) {
         ros::spinOnce();
 
         get_coord();
@@ -170,6 +171,7 @@ int main(int argc, char **argv)
                 ROS_INFO("Corner: (X: %.2f, Y: %.2f)", corner.first, corner.second);
             }
 
+            bool wallFollowingLoop = false;
 	        break;  // Stop the loop if visited position
         }
 
