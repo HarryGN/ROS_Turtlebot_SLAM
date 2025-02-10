@@ -9,49 +9,51 @@ BumpersStruct bumpers;
 #include <geometry_msgs/PoseStamped.h>
 #include <tf/transform_datatypes.h>
 
-void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg) {
-    // Update the global bumper state.
+void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     bumper[msg->bumper] = msg->state;
-    bool leftBumperPressed   = bumper[kobuki_msgs::BumperEvent::LEFT];
-    bool centerBumperPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
-    bool rightBumperPressed  = bumper[kobuki_msgs::BumperEvent::RIGHT];
-    ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", leftBumperPressed, centerBumperPressed, rightBumperPressed);
+    bumpers.leftPressed = bumper[kobuki_msgs::BumperEvent::LEFT];
+    bumpers.centerPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
+    bumpers.rightPressed = bumper[kobuki_msgs::BumperEvent::RIGHT];
 
-    // If any bumper is pressed, publish a pose and a marker.
-    if (leftBumperPressed || centerBumperPressed || rightBumperPressed) {
-        // Publish the current pose.
+    bumpers.anyPressed = bumpers.leftPressed || bumpers.centerPressed || bumpers.rightPressed;
+
+    ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", bumpers.leftPressed, bumpers.centerPressed, bumpers.rightPressed);
+
+    if(bumpers.anyPressed){
+        // Publish a PoseStamped message with the current position and orientation
         geometry_msgs::PoseStamped pose;
         pose.header.stamp = ros::Time::now();
-        pose.header.frame_id = "map"; // Change to "odom" if needed.
+        pose.header.frame_id = "map";
         pose.pose.position.x = posX;
         pose.pose.position.y = posY;
         pose.pose.position.z = 0.0;
         pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
         pose_pub.publish(pose);
 
-        // Create and publish a marker.
-        static int marker_id = 0; // Keep track of unique marker IDs.
+        // Create and publish a CYLINDER marker (appearing as a flat yellow circle)
+        static int marker_id = 0;
         visualization_msgs::Marker marker;
-        marker.header.frame_id = "map";
         marker.header.stamp = ros::Time::now();
+        marker.header.frame_id = "map";
         marker.ns = "bumper_markers";
         marker.id = marker_id++;
-        marker.type = visualization_msgs::Marker::SPHERE;
+        marker.type = visualization_msgs::Marker::CYLINDER;
         marker.action = visualization_msgs::Marker::ADD;
         marker.pose.position.x = posX;
         marker.pose.position.y = posY;
         marker.pose.position.z = 0.0;
         marker.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
-        marker.scale.x = 1.0;
-        marker.scale.y = 1.0;
-        marker.scale.z = 1.0;
-        marker.color.a = 0.95; // Fully opaque.
+        marker.scale.x = 0.3;
+        marker.scale.y = 0.3;
+        marker.scale.z = 0.05;
+        marker.color.a = 1.0;
         marker.color.r = 1.0;
-        marker.color.g = 0.0;
+        marker.color.g = 1.0;
         marker.color.b = 0.0;
         marker_pub.publish(marker);
     }
 }
+
 
 void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     ROS_INFO("handleBumperPressed() called...");
