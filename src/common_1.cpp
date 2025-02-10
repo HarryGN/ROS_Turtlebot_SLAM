@@ -35,3 +35,22 @@ std::vector<std::pair<double, double>> positions;
 
 ros::Publisher vel_pub;
 #pragma endregion
+
+#pragma region main v
+const float target_distance = 0.9;
+const float safe_threshold = 1.0;  // Safe distance threshold
+const double k = 0.18;   // Scaling factor for angular velocity
+const double alpha = 1.8; // Exponential growth/decay rate
+const float max_speed = 0.25;  // Max linear speed
+const float min_speed = 0.1;   // Min linear speed
+float current_x;
+float current_y;
+float delta_x;
+float delta_y;
+int corridor_count = 0;
+bool wall_following = false;
+
+float prev_left_distance = 0.0, prev_right_distance = 0.0;
+float prev_left_idx = 0.0, prev_right_idx = 0.0;
+
+#pragma endregion

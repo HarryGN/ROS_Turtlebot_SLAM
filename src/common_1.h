@@ -41,7 +41,24 @@ extern std::vector<std::pair<double, double>> positions;
 extern ros::Publisher vel_pub;
 #pragma endregion
 
+#pragma region main v
+extern const float target_distance;
+extern const float safe_threshold;  // Safe distance threshold
+extern const double k;   // Scaling factor for angular velocity
+extern const double alpha; // Exponential growth/decay rate
+extern const float max_speed;  // Max linear speed
+extern const float min_speed;   // Min linear speed
+extern float current_x;
+extern float current_y;
+extern float delta_x;
+extern float delta_y;
+extern int corridor_count;
+extern bool wall_following;
 
+extern float prev_left_distance, prev_right_distance;
+extern float prev_left_idx, prev_right_idx;
+
+#pragma endregion
 
 #pragma region bumper
 // uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
