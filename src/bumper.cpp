@@ -1,17 +1,56 @@
 #include "bumper.h"
 
+// Existing global variables for bumper state
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 BumpersStruct bumpers;
 
-void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
+// Make sure to include these headers
+#include <visualization_msgs/Marker.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <tf/transform_datatypes.h>
+
+void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg) {
+    // Update the global bumper state.
     bumper[msg->bumper] = msg->state;
-    bumpers.leftPressed = bumper[kobuki_msgs::BumperEvent::LEFT];
-    bumpers.centerPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
-    bumpers.rightPressed = bumper[kobuki_msgs::BumperEvent::RIGHT];
+    bool leftBumperPressed   = bumper[kobuki_msgs::BumperEvent::LEFT];
+    bool centerBumperPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
+    bool rightBumperPressed  = bumper[kobuki_msgs::BumperEvent::RIGHT];
+    ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", leftBumperPressed, centerBumperPressed, rightBumperPressed);
 
-    bumpers.anyPressed = bumpers.leftPressed || bumpers.centerPressed || bumpers.rightPressed;
+    // If any bumper is pressed, publish a pose and a marker.
+    if (leftBumperPressed || centerBumperPressed || rightBumperPressed) {
+        // Publish the current pose.
+        geometry_msgs::PoseStamped pose;
+        pose.header.stamp = ros::Time::now();
+        pose.header.frame_id = "map"; // Change to "odom" if needed.
+        pose.pose.position.x = posX;
+        pose.pose.position.y = posY;
+        pose.pose.position.z = 0.0;
+        pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
+        pose_pub.publish(pose);
 
-    ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", bumpers.leftPressed, bumpers.centerPressed, bumpers.rightPressed);
+        // Create and publish a marker.
+        static int marker_id = 0; // Keep track of unique marker IDs.
+        visualization_msgs::Marker marker;
+        marker.header.frame_id = "map";
+        marker.header.stamp = ros::Time::now();
+        marker.ns = "bumper_markers";
+        marker.id = marker_id++;
+        marker.type = visualization_msgs::Marker::SPHERE;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.pose.position.x = posX;
+        marker.pose.position.y = posY;
+        marker.pose.position.z = 0.0;
+        marker.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
+        marker.scale.x = 1.0;
+        marker.scale.y = 1.0;
+        marker.scale.z = 1.0;
+        marker.color.a = 0.95; // Fully opaque.
+        marker.color.r = 1.0;
+        marker.color.g = 0.0;
+        marker.color.b = 0.0;
+        marker_pub.publish(marker);
+    }
 }
 
 void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
@@ -92,7 +131,6 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
     rotateToHeading(yaw - turnAngle, vel, vel_pub);
 
 
-
     ROS_INFO("handleBumperPressed() | END");
     linear = 0;
     angular = 0;
@@ -105,19 +143,33 @@ void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publis
 
 }
 
+// void checkBumper(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+//     if(bumpers.anyPressed){
+//         if(bumpers.leftPressed){
+//             handleBumperPressed((float) -60, vel, vel_pub);
+//         }
+
+//         else if(bumpers.rightPressed){
+//             handleBumperPressed((float) 60, vel, vel_pub);
+//         }
+
+//         else if(bumpers.centerPressed){
+//             handleBumperPressed((float) 0.0, vel, vel_pub);
+//         }
+//     }
+// }    
+
+
 void checkBumper(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     if(bumpers.anyPressed){
-        if(bumpers.leftPressed){
-            handleBumperPressed((float) -60, vel, vel_pub);
+        if(bumper[kobuki_msgs::BumperEvent::LEFT]){
+            handleBumperPressed(-60.0f, vel, vel_pub);
         }
-
-        else if(bumpers.rightPressed){
-            handleBumperPressed((float) 60, vel, vel_pub);
+        else if(bumper[kobuki_msgs::BumperEvent::RIGHT]){
+            handleBumperPressed(60.0f, vel, vel_pub);
         }
-
-        else if(bumpers.centerPressed){
-            handleBumperPressed((float) 0.0, vel, vel_pub);
+        else if(bumper[kobuki_msgs::BumperEvent::CENTER]){
+            handleBumperPressed(0.0f, vel, vel_pub);
         }
     }
-}     
-
+}
