@@ -34,6 +34,9 @@ extern float minLinear, maxLinear;
 extern bool prev_turn, curr_turn;
 extern float full_angle;
 
+extern int nLasers;       // 激光雷达数据的数量
+extern int right_idx, front_idx, left_idx;
+
 extern std::vector<std::pair<double, double>> positions;
 extern ros::Publisher vel_pub;
 #pragma endregion

@@ -26,6 +26,10 @@ bool prev_turn = false;
 bool curr_turn = false;
 
 float full_angle = 57;
+int nLasers = 0;       // 激光雷达数据的数量
+int right_idx = 0;     // 右侧激光索引
+int front_idx = 0;     // 前方激光索引
+int left_idx = 0;      // 左侧激光索引
 
 std::vector<std::pair<double, double>> positions;
 

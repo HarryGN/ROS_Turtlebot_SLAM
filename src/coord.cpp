@@ -1,5 +1,13 @@
 #include "coord.h"
 
+void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
+    posX = msg->pose.pose.position.x;
+    posY = msg->pose.pose.position.y;
+    yaw = RAD2DEG(tf::getYaw(msg->pose.pose.orientation));
+    // //ROS_INFO("(x,y):(%f,%f) Orint: %f rad or %f degrees.", posX, posY, yaw, RAD2DEG(yaw));
+    // ROS_INFO("(x,y):(%f,%f).", posX, posY);
+}
+
 // Store the current coordinates in the position vector
 void get_coord() {
     bool is_visited = false;
