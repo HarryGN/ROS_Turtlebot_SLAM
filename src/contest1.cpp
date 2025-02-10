@@ -4,20 +4,30 @@
 #include "movement.h"
 #include "biasedExplore.h"
 #include "wallFollowing.h"
+#include <ros/ros.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <visualization_msgs/Marker.h>
+
+// Define global publishers declared as extern in bumper.h
+ros::Publisher pose_pub;
+ros::Publisher marker_pub;
 
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
 
+    // Subscribers
     ros::Subscriber bumper_sub = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
     ros::Subscriber laser_sub = nh.subscribe("scan", 10, &laserCallback);
     ros::Subscriber subOdom = nh.subscribe("odom", 1, &odomCallback);
 
+    // Publishers
     ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
+    pose_pub = nh.advertise<geometry_msgs::PoseStamped>("bumper_pose", 10);
+    marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 10);
 
     ros::Rate loop_rate(10);
-
     geometry_msgs::Twist vel;
 
     // contest count down timer
@@ -155,7 +165,6 @@ int main(int argc, char **argv)
         prev_turn = curr_turn;
 
         vel_pub.publish(vel);
-
 
         // Loop Checker
         if (is_position_visited(posX, posY)) {
