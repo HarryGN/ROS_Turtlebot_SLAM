@@ -1,6 +1,4 @@
-bumper.h
-#ifndef bumperHeader
-#define bumperHeader
+#ifndef bumperHeader#define bumperHeader
 
 #include "common.h"
 #include "movement.h"

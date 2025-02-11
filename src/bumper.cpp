@@ -1,5 +1,3 @@
-BUMPER.cpp
-
 #include "bumper.h"
 
 // Existing global variables for bumper state
