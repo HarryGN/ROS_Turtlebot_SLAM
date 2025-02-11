@@ -12,7 +12,9 @@ find_package(catkin REQUIRED COMPONENTS
 	genmsg
 	image_transport
 	sensor_msgs
-	kobuki_msgs)
+	kobuki_msgs
+	tf
+)
 
 generate_messages(DEPENDENCIES sensor_msgs kobuki_msgs)
 
@@ -23,4 +25,3 @@ include_directories(include ${OpenCV_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
 # add the publisher example
 add_executable(contest1 src/contest1.cpp src/bumper.cpp src/common.cpp src/laser.cpp src/movement.cpp src/biasedExplore.cpp src/wallFollowing.cpp)
 target_link_libraries(contest1 ${catkin_LIBRARIES} ${OpenCV_LIB})
-

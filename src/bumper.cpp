@@ -3,6 +3,12 @@
 uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
 BumpersStruct bumpers;
 
+// Make sure to include these headers
+#include <tf/transform_listener.h> // For transforming poses
+#include <visualization_msgs/Marker.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <tf/transform_datatypes.h>
+
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     bumper[msg->bumper] = msg->state;
     bumpers.leftPressed = bumper[kobuki_msgs::BumperEvent::LEFT];
@@ -12,6 +18,53 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     bumpers.anyPressed = bumpers.leftPressed || bumpers.centerPressed || bumpers.rightPressed;
 
     ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", bumpers.leftPressed, bumpers.centerPressed, bumpers.rightPressed);
+
+    if(bumpers.anyPressed){
+        // Create a PoseStamped in the "odom" frame using current odometry data.
+        geometry_msgs::PoseStamped odom_pose;
+        odom_pose.header.stamp = ros::Time::now();
+        odom_pose.header.frame_id = "odom";  // Use "odom" since posX and posY come from odometry
+        odom_pose.pose.position.x = posX;
+        odom_pose.pose.position.y = posY;
+        odom_pose.pose.position.z = 0.0;
+        odom_pose.pose.orientation = tf::createQuaternionMsgFromYaw(Deg2Rad(yaw));
+
+        // Transform the odom_pose to the "map" frame.
+        static tf::TransformListener listener;
+        geometry_msgs::PoseStamped map_pose;
+        try{
+            listener.waitForTransform("map", "odom", ros::Time(0), ros::Duration(1.0));
+            listener.transformPose("map", odom_pose, map_pose);
+        }
+        catch(tf::TransformException &ex){
+            ROS_WARN("Transform failed: %s", ex.what());
+            // Fallback: use the odom_pose if the transform fails (but change its frame id)
+            map_pose = odom_pose;
+            map_pose.header.frame_id = "map";
+        }
+
+        // Publish transformed pose
+        pose_pub.publish(map_pose);
+
+        // Create and publish a SPHERE marker (yellow, circular, and larger)
+        static int marker_id = 0;
+        visualization_msgs::Marker marker;
+        marker.header.stamp = ros::Time::now();
+        marker.header.frame_id = "map";
+        marker.ns = "bumper_markers";
+        marker.id = marker_id++;
+        marker.type = visualization_msgs::Marker::SPHERE;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.pose = map_pose.pose;  // Use the transformed pose.
+        marker.scale.x = 0.15;
+        marker.scale.y = 0.15;
+        marker.scale.z = 0.15;
+        marker.color.a = 1.0;
+        marker.color.r = 0.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+        marker_pub.publish(marker);
+    }
 }
 
 void handleBumperPressed(float turnAngle, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
