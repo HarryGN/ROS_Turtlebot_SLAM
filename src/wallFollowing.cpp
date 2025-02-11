@@ -211,7 +211,7 @@ void wallFollowing(WallSide wall_side, DistancesStruct distances, bool curr_turn
         }
     } 
 
-    else if (front_dist < 0.9 & left_dist < 0.9 & right_dist < 0.9 ) {
+    else if (front_dist < 0.68 & left_dist < 0.6 & right_dist < 0.68 ) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("surrounded by three walls");
         rotateRobot(-0.25, 12.56, vel, vel_pub);
