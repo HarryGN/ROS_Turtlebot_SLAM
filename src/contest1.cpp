@@ -108,9 +108,16 @@ int main(int argc, char **argv)
     //initial state check
     sweptPoints.clear();
     sweep360(sweptPoints, vel, vel_pub);
-    ROS_INFO("Size: %zu", sweptPoints.size());
-    
-    findNextDestination(posX, posY, sweptPoints, visitedPoints, nextX, nextY);
+    // find left wall
+    std::array<float, 2> leftWall = findLeftWall(sweptPoints);
+    if (leftWall[0] != -1 && leftWall[1] != -1) {
+        ROS_INFO("Left Wall found at: (%.2f, %.2f)", leftWall[0], leftWall[1]);
+    } else {
+        ROS_WARN("No left wall detected!");
+    }
+
+    findFirstDestination(posX, posY, sweptPoints, visitedPoints, nextX, nextY);
+    rotateToStarting(nextX, nextY, vel, vel_pub);
  
 
 

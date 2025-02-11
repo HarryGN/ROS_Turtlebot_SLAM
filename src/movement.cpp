@@ -182,6 +182,45 @@ void navigateToPosition(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::
     ROS_INFO("...navigateToPosition completed.");
 }
 
+void rotateToStarting(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+    ROS_INFO("navigateToPosition() called with target(%.2f, %.2f)...", tgtX, tgtY);
+    ros::spinOnce();
+
+    int counter = 0;
+    int bumperHits = 0;
+    int bumperHitsLimit = 3;
+    
+    float dx = tgtX-posX;
+    float dy = tgtY-posY;
+    float d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
+
+    // Set and rotate to initial heading
+    float targetHeading = Rad2Deg(atan2(dy, dx));
+    rotateToHeading(targetHeading, vel, vel_pub);
+
+    // While loop until robot gets there
+
+
+    targetHeading = Rad2Deg(atan2(dy, dx));
+    minAngular = 0;
+    angular = computeAngular(targetHeading, yaw);
+    minAngular = 15;
+
+    vel.angular.z = angular;
+    vel.linear.x = linear;
+    vel_pub.publish(vel);
+
+
+
+    linear = 0;
+    angular = 0;
+    vel.angular.z = angular;
+    vel.linear.x = linear;
+    vel_pub.publish(vel);
+
+    ROS_INFO("...navigateToPosition completed.");
+}
+
 void navigateToPositionSmart(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
     ROS_INFO("navigateToPositionSmart(...) called");
     

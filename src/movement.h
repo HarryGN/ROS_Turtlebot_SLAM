@@ -22,5 +22,7 @@ void navigateToPosition(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::
 
 void navigateToPositionSmart(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::Publisher &vel_pub);
 
+void rotateToStarting(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::Publisher &vel_pub);
+
 #endif
 
