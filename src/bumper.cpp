@@ -30,6 +30,23 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
         pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
         pose_pub.publish(pose);
 
+        // Transform the odom_pose to the map frame
+        static tf::TransformListener listener;
+        geometry_msgs::PoseStamped map_pose;
+        try{
+            listener.waitForTransform("map", "odom", ros::Time(0), ros::Duration(1.0));
+            listener.transformPose("map", odom_pose, map_pose);
+        }
+        catch(tf::TransformException &ex){
+            ROS_WARN("Transform failed: %s", ex.what());
+            // Fallback: in case the transform fails, use the odom_pose directly
+            map_pose = odom_pose;
+            map_pose.header.frame_id = "map";
+        }
+
+        // Publish the transformed pose
+        pose_pub.publish(map_pose);
+
         // Create and publish a SPHERE marker (yellow, circular, and larger)
         static int marker_id = 0;
         visualization_msgs::Marker marker;
@@ -39,10 +56,7 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
         marker.id = marker_id++;
         marker.type = visualization_msgs::Marker::SPHERE;
         marker.action = visualization_msgs::Marker::ADD;
-        marker.pose.position.x = posX;
-        marker.pose.position.y = posY;
-        marker.pose.position.z = 0.0;
-        marker.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
+        marker.pose = map_pose.pose;  // Use the transformed pose
         marker.scale.x = 0.3;
         marker.scale.y = 0.3;
         marker.scale.z = 0.3;
