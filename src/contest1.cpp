@@ -1,219 +1,20 @@
-#include <ros/console.h>
-#include "ros/ros.h"
-#include <geometry_msgs/Twist.h>
-#include <kobuki_msgs/BumperEvent.h>
-#include <sensor_msgs/LaserScan.h>
-#include <nav_msgs/Odometry.h>
-#include <tf/transform_datatypes.h>
-
-#include <stdio.h>
-#include <cmath>
-
-#include <chrono>
-#include <thread>
-
-#include <math.h>
-
-#define N_BUMPER (3)
-#define Rad2Deg(rad) ((rad) * 180. / M_PI)
-#define Deg2Rad(deg) ((deg) * M_PI / 180.)
-
-float angular;
-float linear;
-float posX = 0.0, posY = 0.0, yaw = 0.0;
-
-float minLaserDist = std::numeric_limits<float>::infinity();
-
-float left_distance = 0.0, right_distance = 0.0, front_distance = 0.0;
-// float maxLaserDist = std::numeric_limits<float>::();
-int32_t nLasers=0, desiredNLasers=0, desiredAngle=5;
-
-float rotationTolerance = Deg2Rad(1);
-float kp_r = 1;
-float kn_r = 0.7;
-float minAngular = 10; // Degrees per second
-float maxAngular = 90; // Degrees per second
-
-float navigationTolerance = 0.2;
-float kp_n = 0.02;
-float kn_n = 0.5;
-float minLinear = 0.1;
-float maxLinear = 0.45;
-
-uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEvent::RELEASED};
-bool leftBumperPressed;
-bool centerBumperPressed;
-bool rightBumperPressed;
-
-void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
-{
-    bumper[msg->bumper] = msg->state;
-    leftBumperPressed = bumper[kobuki_msgs::BumperEvent::LEFT];
-    centerBumperPressed = bumper[kobuki_msgs::BumperEvent::CENTER];
-    rightBumperPressed = bumper[kobuki_msgs::BumperEvent::RIGHT];
-    ROS_INFO("BUMPER STATES L/C/R: %u/%u/%u", leftBumperPressed, centerBumperPressed, rightBumperPressed);
-}
-
-void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
-{
-    minLaserDist = std::numeric_limits<float>::infinity();
-    // maxLaserDist = std::numeric_limits<float>::infinity();
-    nLasers = (msg->angle_max - msg->angle_min) / msg->angle_increment;
-    // desiredNLasers = desiredAngle*M_PI / (180*msg->angle_increment);
-
-    // Get the indices for first, middle, and last readings
-    int left_idx = 0;                 // First reading (left)
-    int front_idx = nLasers / 2;      // Middle reading (front)
-    int right_idx = nLasers - 1;      // Last reading (right)
-    
-    float right_distance = msg->ranges[left_idx];
-    float front_distance = msg->ranges[front_idx];
-    float left_distance = msg->ranges[right_idx];
-
-    // Log the results
-    ROS_INFO("Left (first) distance: %.2f m", left_distance);
-    ROS_INFO("Front (middle) distance: %.2f m", front_distance);
-    ROS_INFO("Right (last) distance: %.2f m", right_distance);
-    
-    // if (desiredAngle * M_PI / 180 < msg->angle_max && -desiredAngle * M_PI / 180 > msg->angle_min) {
-    //     for (uint32_t laser_idx = nLasers / 2 - desiredNLasers; laser_idx < nLasers / 2 + desiredNLasers; ++laser_idx){
-    //         minLaserDist = std::min(minLaserDist, msg->ranges[laser_idx]);
-    //     }
-    // }
-    // else {
-    //     for (uint32_t laser_idx = 0; laser_idx < nLasers; ++laser_idx) {
-    //          std::min(minLaserDist, msg->ranges[laser_idx]);
-    //     }
-    // }
-
-    // ROS_INFO("Min distance: %i", minLaserDist);
-}
-
-void odomCallback (const nav_msgs::Odometry::ConstPtr& msg)
-{
-    posX = msg->pose.pose.position.x;
-    posY = msg->pose.pose.position.y;
-    yaw = tf::getYaw(msg->pose.pose.orientation);
-   
-}
-// void callbackOdom(const nav_msgs::Odometry::ConstPtr& msg)
-// {
-//     posX = msg->pose.pose.position.x;
-//     posY = msg->pose.pose.position.y;
-//     yaw = Rad2Deg(tf::getYaw(msg->pose.pose.orientation));
-//     //ROS_INFO("Position: (%f, %f) Orientation: %f rad or %f degrees.", posX, posY, yaw, Rad2Deg(yaw));
-// }
-
-float absPow(float base, float exp){
-    if(base < 0){
-        return (float) -1*pow(-1*base, exp);
-    }
-    else{
-        return (float) pow(base, exp);
-    } 
-}
-
-void applyMagnitudeLimits(float &value, float lowerLimit, float upperLimit){
-    if(value < 0){
-        if(value < -upperLimit){
-            value = -upperLimit;
-        }
-        else if(value > -lowerLimit){
-            value = -lowerLimit;
-        }
-    }
-
-    else if(value > 0){
-        if(value > upperLimit){
-            value = upperLimit;
-        }
-        else if(value < lowerLimit){
-            value = lowerLimit;
-        }
-    }
-}
-
-float computeAngular(float targetHeading, float currentYaw){
-    float angularDeg;
-
-    // Calculate proportional component and then calculate angularDeg based on if it is negative or positive
-    float proportional = kp_r*(targetHeading-currentYaw);
-    if(proportional < 0){
-        angularDeg = (float) -1*pow(-1*proportional, kn_r);
-    }
-    else{
-        angularDeg = (float) pow(proportional, kn_r);
-    }
-
-    applyMagnitudeLimits(angularDeg, minAngular, maxAngular);
-
-    return Deg2Rad(angularDeg);
-}
-
-void rotateToHeading(float targetHeading, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
-    ROS_INFO("ROTATE TO HEADING CALLED");
-    ros::spinOnce();
-
-    float proportional;
-    while(abs(targetHeading - yaw) > rotationTolerance){
-
-        angular = computeAngular(targetHeading, yaw);
-
-        ros::spinOnce();
-        vel.angular.z = angular;
-        vel.linear.x = 0;
-        vel_pub.publish(vel);
-
-        ROS_INFO("Target/Current Yaw: %f/%f degs | Setpoint: %f degs/s", targetHeading, yaw, Rad2Deg(angular));
-    }
-
-    vel.angular.z = 0;
-    vel.linear.x = 0;
-    vel_pub.publish(vel);
-
-}
+//PERCY
+#include "bumper.h"
+#include "laser.h"
+#include "movement.h"
+#include "biasedExplore.h"
+#include "wallFollowing.h"
+#include <ros/ros.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <visualization_msgs/Marker.h>
 
 
-void navigateToPosition(float x, float y, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
-    ROS_INFO("navigateToPosition() CALLED");
-    ros::spinOnce();
-    
-    float dx = x-posX;
-    float dy = y-posY;
-    float d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
+// Define global publishers declared as extern in bumper.h
+ros::Publisher pose_pub;
+ros::Publisher marker_pub;
 
-    // Set and rotate to initial heading
-    float targetHeading = Rad2Deg(atan2(dy, dx));
-    rotateToHeading(targetHeading, vel, vel_pub);
 
-    // While loop until robot gets there
-    while(d > navigationTolerance){
-        ros::spinOnce();
-        dx = x-posX;
-        dy = y-posY;
-        d = (float) sqrt(pow(dx, 2) + pow(dy, 2));
-
-        linear = (float) pow(kp_n*d, kn_n);
-        applyMagnitudeLimits(linear, minLinear, maxLinear);
-
-        targetHeading = Rad2Deg(atan2(dy, dx));
-        angular = computeAngular(targetHeading, yaw);
-
-        vel.angular.z = 0;
-        vel.linear.x = linear;
-        vel_pub.publish(vel);
-
-        ROS_INFO("Tgt X/Y: %f/%f | Pos X/Y: %f/%f | Lin/Ang: %f/%f", x, y, posX, posY, linear, Rad2Deg(angular));
-    }
-
-    linear = 0;
-    angular = 0;
-    vel.angular.z = angular;
-    vel.linear.x = 0;
-    vel_pub.publish(vel);
-
-    ROS_INFO("Successful exit from navigateToPosition.");
-}
+enum Mode {WALL_FOLLOW, RANDOM_NAVIGATE};
 
 
 int main(int argc, char **argv)
@@ -222,133 +23,214 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
 
+
+    // Subscribers
     ros::Subscriber bumper_sub = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
     ros::Subscriber laser_sub = nh.subscribe("scan", 10, &laserCallback);
-    ros::Subscriber odom = nh.subscribe("odom", 1, odomCallback); 
+    ros::Subscriber subOdom = nh.subscribe("odom", 1, &odomCallback);
 
+
+    // Publishers
     ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
+    pose_pub = nh.advertise<geometry_msgs::PoseStamped>("bumper_pose", 10);
+    marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 10);
+
 
     ros::Rate loop_rate(10);
-
     geometry_msgs::Twist vel;
+
 
     // contest count down timer
     std::chrono::time_point<std::chrono::system_clock> start;
     start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
 
-    // Bumper Event Settings
-    bool bumperStepBack = false;
-    uint64_t tBumperEventStart;
-    uint64_t dBumperStepBack = 2;
-
-    uint64_t dBumperEvent[4] = {3,7,3,7};
-    uint64_t dBumperEventTotal = 0;
-    for(int i = 0; i < sizeof(dBumperEvent)/sizeof(*dBumperEvent); i++){
-        dBumperEventTotal += dBumperEvent[i];
-    }
-
 
     angular = 0.0;
     linear = 0.0;
+    vel.angular.z = angular;
+    vel.linear.x = linear;
+    vel_pub.publish(vel);
 
-    // rotateToHeading(90, vel, vel_pub);
-    // rotateEndlessly(vel, vel_pub);
-    // navigateToPosition(-1.929,1.346, vel, vel_pub);
-    // navigateToPosition(-1.7069999999999999,-1.0, vel, vel_pub);
-    // navigateToPosition(-0.8680000000000001,1.4365, vel, vel_pub);
-    // navigateToPosition(-0.3763333333333332,-1.1406666666666667, vel, vel_pub);
-    // navigateToPosition(0.19299999999999984,1.5270000000000001, vel, vel_pub);
-    // navigateToPosition(0.9543333333333335,-1.2813333333333332, vel, vel_pub);
-    // navigateToPosition(1.2539999999999998,1.6175, vel, vel_pub);
-    // navigateToPosition(2.285,-1.422, vel, vel_pub);
-    // navigateToPosition(2.3149999999999995,1.708, vel, vel_pub);
+
+    std::vector<std::array<float, 2>> sweptPoints;
+    std::vector<std::array<float, 2>> visitedPoints;
+    float nextX, nextY;
+
+
+
+
+    #pragma region wallFollowing Param
+    const float target_distance = 0.9;
+    const float safe_threshold = 1.0;  // Safe distance threshold
+    const double k = 0.15;   // Scaling factor for angular velocity
+    const double alpha = 1.4; // Exponential growth/decay rate
+    const float max_speed = 0.25;  // Max linear speed
+    const float min_speed = 0.1;   // Min linear speed
+    float current_x;
+    float current_y;
+    float delta_x;
+    float delta_y;
+    int corridor_count = 0;
+    bool wall_following = false;
+
+
+    // 全局变量：存储上一帧的左/右激光读数
+    bool prev_turn = false;
+    bool curr_turn = false;
+
+
+    float prev_left_distance = 0.0, prev_right_distance = 0.0;
+
+
+    float front_dist;
+    float left_dist;
+    float right_dist;
+
+
+    float corridor_threshold = 0.6;   // 设定通道触发阈值
+    float max_distance_change = 1.5;  // 设定最大突变距离
+    float min_rotation = 30.0;        // 最小旋转角度
+    float max_rotation = 90.0;        // 最大旋转角度
+    float left_change;
+    float right_change;
+
+
+    std::pair<std::pair<double, double>, std::pair<double, double>> corners;
+
+
+    #pragma endregion
+    // wallFollowing
+
+
+    Mode mode = WALL_FOLLOW;
+    bool fullRoundCompleted = false;
+
+    //initial state check
+    sweptPoints.clear();
+    sweep360(sweptPoints, vel, vel_pub);
+    // find left wall
+    std::array<float, 2> leftWall = findLeftWall(sweptPoints);
+    if (leftWall[0] != -1 && leftWall[1] != -1) {
+        ROS_INFO("Left Wall found at: (%.2f, %.2f)", leftWall[0], leftWall[1]);
+    } else {
+        ROS_WARN("No left wall detected!");
+    }
+
+    findFirstDestination(posX, posY, sweptPoints, visitedPoints, nextX, nextY);
+    rotateToStarting(nextX, nextY, vel, vel_pub);
+ 
+
 
     while(ros::ok()) {
         ros::spinOnce();
-        
-        #pragma region Bumper
-        // Bumper Event
-        if(leftBumperPressed || centerBumperPressed || rightBumperPressed){
-            bumperStepBack = true;
-            tBumperEventStart = secondsElapsed;
-        }
 
-        const double k = 0.1;   // Scaling factor for angular velocity
-        const double alpha = 0.5; // Exponential growth/decay rate
-        float target_distance = 1.5;
 
-        if(bumperStepBack){
-            uint64_t dBumperEventRemaining = secondsElapsed - tBumperEventStart;
+        switch (mode) {
+            case WALL_FOLLOW: {
 
-            if(dBumperEventRemaining < dBumperEvent[0]){
-                linear = -0.1;
-                angular = 0.0;
-            }
-            
-            else if(dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1]){
-                linear = 0.0;
-                angular = Deg2Rad(15);
-            }
+                get_coord();
+                corners = filter_corner();
 
-            else if(dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2]){
-                linear = 0.1;
-                angular = 0.0;
-            } 
-            
-            else if (dBumperEventRemaining < dBumperEvent[0] + dBumperEvent[1] + dBumperEvent[2] + dBumperEvent[3]){
-                linear = 0.0;
-                angular = Deg2Rad(-15);
-            }
+                // Check distances
+                front_dist = std::isnan(distances.frontRay) ? safe_threshold : distances.frontRay;
+                left_dist = std::isnan(distances.leftRay) ? safe_threshold : distances.leftRay;
+                right_dist = std::isnan(distances.rightRay) ? safe_threshold : distances.rightRay;
 
-            else{
-                bumperStepBack = false;
-                angular = 0.0;
-                linear = 0.1;
-            }
-        }
-        #pragma endregion
+                curr_turn = false;
 
-        else if(front_distance > 1.0 && !std::isnan(front_distance) && !std::isnan(left_distance) && !std::isnan(right_distance)){
-            ROS_INFO("Left Wall Following");
-            if (left_distance < target_distance || left_distance > target_distance) {
-                ros::spinOnce();
+                // Determine if wall is being followed based on left and right distances
+                left_change = left_dist - prev_left_distance;
+                right_change = right_dist - prev_right_distance;
+                if (left_change < 0.1 || right_change < 0.1){
+                    wall_following = true;
+                }
 
-                linear = 0.2;
-                ROS_INFO("Linear: %i", linear);
+                // Main Wall Following Algorithm
+                if (left_change > corridor_threshold && wall_following) {
                 
+                    ROS_WARN("Detected corridor on the LEFT!");
+                   
+                    vel.angular.z = 0.0;  // No adjustment needed
+
+                    // Initialize current position if this is the first corridor detection
+                    if (corridor_count < 1) {
+                        current_x = posX;
+                        current_y = posY;
+                        corridor_count += 1;
+                    }
+
+
+                    moveRobot(distances.leftVertPrev, 0, vel, vel_pub);
+                    ROS_WARN("front distance move %.1f°", distances.leftVertPrev);
+                    wall_following = false;
+                }
+
+
+                else if (right_change > corridor_threshold && wall_following) {
+
+                    ROS_WARN("Detected corridor on the RIGHT!");
+                    wall_following = false;
+                }
+
+
+                else {
                 
-                angular = -k * std::exp(alpha * left_distance);  // Exponential decay for right turns
+                    WallSide wall_side = LEFT; // Change to RIGHT to follow the right wall
+                  
+                    wallFollowing(wall_side, distances, curr_turn, prev_turn, left_dist, right_dist, front_dist, target_distance, min_speed, k, alpha, vel, vel_pub);
+                }
 
-            // } 
-            // else if (left_distance > target_distance) {
-            //     angular = -k * std::exp(alpha * left_distance);  // Exponential decay for right turns
-            //     linear = (float) pow(kp_n*front_distance, kn_n);
-            //     ROS_INFO("Linear: %i", linear);
-            // }
 
-            }
+                prev_left_distance = left_dist;
+                prev_right_distance = right_dist;
+                prev_turn = curr_turn;
 
-            else{
-                angular = 0.0;                                  // No angular adjustment
-                linear = 0.2;
+
+                vel_pub.publish(vel);
+
+
+                // Loop Checker
+                if (is_position_visited(posX, posY)) {
+                    ROS_INFO("Robot has completed a round and returned to previous position.");
+                    fullRoundCompleted = true;
+                    mode = RANDOM_NAVIGATE;  // Transition to random navigation
+                    break;  // Stop wall-following
+                }
+
+
+                break;
             }
+            case RANDOM_NAVIGATE: {
+                sweptPoints.clear();
+                sweep360(sweptPoints, vel, vel_pub);
+                ROS_INFO("Size: %zu", sweptPoints.size());
+               
+                findNextDestination(posX, posY, sweptPoints, visitedPoints, nextX, nextY);
+
+
+                ROS_INFO("----------------Visited Positions----------------");
+                for(int i = 0; i < visitedPoints.size(); i++){
+                    ROS_INFO("(%.2f,%.2f)", visitedPoints[i][0], visitedPoints[i][1]);
+                }
+
+
+                navigateToPosition(nextX, nextY, vel, vel_pub);  
+               
+                break;
             }
-        
-        else{
-            ROS_INFO("Adjusting position");
-            linear = 0.0;
-            angular = 0.2;                     // Rotate in place to adjust to right
         }
 
-        vel.angular.z = angular;
-        vel.linear.x = linear;
-        vel_pub.publish(vel);
-
-        // The last thing to do is to update the timer.
         secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
         loop_rate.sleep();
     }
 
+
     return 0;
 }
+
+
+
+
+
+
