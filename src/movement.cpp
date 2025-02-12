@@ -183,7 +183,7 @@ void navigateToPosition(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::
 }
 
 void rotateToStarting(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
-    ROS_INFO("navigateToPosition() called with target(%.2f, %.2f)...", tgtX, tgtY);
+    ROS_INFO("rotateToStarting called with target(%.2f, %.2f)...", tgtX, tgtY);
     ros::spinOnce();
 
     int counter = 0;
@@ -218,7 +218,7 @@ void rotateToStarting(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::Pu
     vel.linear.x = linear;
     vel_pub.publish(vel);
 
-    ROS_INFO("...navigateToPosition completed.");
+    ROS_INFO("...rotateToStarting completed.");
 }
 
 void navigateToPositionSmart(float tgtX, float tgtY, geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
