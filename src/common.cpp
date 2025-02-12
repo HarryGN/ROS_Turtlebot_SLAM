@@ -1,8 +1,5 @@
 #include "common.h"
 
-
-
-
 float absPow(float base, float exp){
     if(base < 0){
         return (float) -1*pow(-1*base, exp);
