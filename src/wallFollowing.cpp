@@ -134,17 +134,30 @@ std::vector<std::pair<double, double>> get_all_corners() {
     return all_corners;
 }
 
-// Function to move the robot with a given linear and angular velocity
 void moveRobot(double linear_x, double angular_z, geometry_msgs::Twist &vel_msg, ros::Publisher &vel_pub) {
+    // 设定固定速度 0.1 m/s
+    double speed = 0.1;  
+    double duration = linear_x / speed; // 计算所需时间
 
-    // Set the linear and angular velocity
-    vel_msg.linear.x = linear_x;
+    // 设置线速度和角速度
+    vel_msg.linear.x = speed;
     vel_msg.angular.z = angular_z;
 
-    // Publish the velocity message
+    ros::Time start_time = ros::Time::now();
+    while ((ros::Time::now() - start_time).toSec() < duration) {
+        vel_pub.publish(vel_msg); // 发布速度指令
+        ros::spinOnce(); // 处理ROS回调
+        ros::Duration(0.1).sleep(); // 控制循环频率
+    }
+
+    // 停止机器人
+    vel_msg.linear.x = 0;
+    vel_msg.angular.z = 0;
     vel_pub.publish(vel_msg);
-    ROS_INFO("Publishing velocity command: linear_x = %f, angular_z = %f", linear_x, angular_z);
+
+    ROS_INFO("Robot moved %.2f meters at 0.1 m/s", linear_x);
 }
+
 
 // Function to rotate the robot locally
 void rotateRobot(double angular_speed, double duration, geometry_msgs::Twist &vel_msg, ros::Publisher &vel_pub) {
@@ -222,14 +235,14 @@ void wallFollowing(WallSide wall_side, DistancesStruct distances, bool curr_turn
     else if (front_dist < 0.9 & left_dist < 0.9 & right_dist > 0.9  & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("Turn to the right");
-        rotateRobot(-0.25, 6.28, vel, vel_pub);
+        rotateRobot(-0.18, 6.28, vel, vel_pub);
         rotateRobot(0, 0, vel, vel_pub);
         curr_turn = true;
     }
     else if (front_dist < 0.9 & left_dist > 0.9 & right_dist < 0.9 & curr_turn != prev_turn) {
         // vel.angular.z = -1.57;  // 1.57 radians = 90 degrees
         ROS_INFO("Turn to the left");
-        rotateRobot(0.25, 6.28, vel, vel_pub);
+        rotateRobot(0.18, 6.28, vel, vel_pub);
         rotateRobot(0, 0, vel, vel_pub);
         curr_turn = true;
     }
