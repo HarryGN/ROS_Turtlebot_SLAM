@@ -8,8 +8,6 @@ This project involves the development of an autonomous navigation and mapping al
 2. [Detailed Robot Design and Implementation](#detailed-robot-design-and-implementation)
 3. [Future Recommendations](#future-recommendations)
 4. [References](#references)
-5. [Attribution Table](#attribution-table)
-6. [Appendix - Full C++ ROS Code](#appendix---full-c-ros-code)
 
 ---
 
